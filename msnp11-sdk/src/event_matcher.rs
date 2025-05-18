@@ -1,6 +1,8 @@
 use crate::event::Event;
 use crate::internal_event::InternalEvent;
 use crate::list::List;
+use crate::models::personal_message::PersonalMessage;
+use crate::models::presence::Presence;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use core::str;
 
@@ -52,7 +54,7 @@ pub fn match_event(base64_message: &String) -> Event {
             let lists_number = args[lists_number_index]
                 .parse::<u32>()
                 .expect("Found invalid list number");
-            
+
             if lists_number & 1 == 1 {
                 lists.push(List::ForwardList);
             }
@@ -76,7 +78,7 @@ pub fn match_event(base64_message: &String) -> Event {
             if lists_number & 1 == 1 {
                 let mut groups: Vec<String> = Vec::new();
                 if args.len() > 5 {
-                    let _ = args[5].split(",").map(|id| groups.push(id.to_string()));
+                    groups = args[5].split(",").map(|id| id.to_string()).collect();
                 }
 
                 Event::ContactInForwardList {
@@ -96,6 +98,54 @@ pub fn match_event(base64_message: &String) -> Event {
                         .to_string(),
                     lists,
                 }
+            }
+        }
+
+        "NLN" | "ILN" => {
+            let base_index = if args[0] == "ILN" { 1 } else { 0 };
+            let msn_object = if args[0] == "ILN" && args.len() > 6 {
+                Some(
+                    urlencoding::decode(args[6])
+                        .expect("Could not url decode MSN object")
+                        .to_string(),
+                )
+            } else if args[0] == "NLN" && args.len() > 5 {
+                Some(
+                    urlencoding::decode(args[5])
+                        .expect("Could not url decode MSN object")
+                        .to_string(),
+                )
+            } else {
+                None
+            };
+
+            Event::PresenceUpdate {
+                email: args[base_index + 2].to_string(),
+                display_name: urlencoding::decode(args[base_index + 3])
+                    .expect("Could not url decode contact name")
+                    .to_string(),
+                presence: Presence {
+                    presence: args[base_index + 1].to_string(),
+                    client_id: args[base_index + 4]
+                        .to_string()
+                        .parse()
+                        .unwrap_or_else(|_| 0),
+                    msn_object,
+                },
+            }
+        }
+
+        "UBX" => {
+            let payload = reply.replace(command.as_str(), "");
+            let personal_message =
+                quick_xml::de::from_str(payload.as_str()).unwrap_or_else(|_| PersonalMessage {
+                    psm: "".to_string(),
+                    current_media: "".to_string(),
+                });
+
+            Event::PersonalMessageUpdate {
+                email: args[1].to_string(),
+                personal_message,
             }
         }
 

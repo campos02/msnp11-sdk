@@ -34,15 +34,16 @@ pub enum Event {
         lists: Vec<List>,
         groups: Vec<String>,
     },
-    
+
     PresenceUpdate {
         email: String,
-        presence: Presence
+        display_name: String,
+        presence: Presence,
     },
-    
+
     PersonalMessageUpdate {
         email: String,
-        personal_message: PersonalMessage
+        personal_message: PersonalMessage,
     },
 
     Disconnected,

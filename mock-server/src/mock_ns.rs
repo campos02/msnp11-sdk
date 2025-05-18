@@ -1,4 +1,5 @@
 use core::str;
+use log::trace;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 pub struct MockNS;
@@ -21,6 +22,8 @@ impl MockNS {
                     }
 
                     let message = unsafe { str::from_utf8_unchecked(&buf[..received]) };
+                    trace!("C: {message}");
+                    
                     let replies: &[String] = match message {
                         "VER 1 MSNP11 CVR0\r\n" => &["VER 1 MSNP11\r\n".to_string()],
                         "CVR 2 0x0409 winnt 10 i386 msnp11-sdk 0.01 msmsgs testing@example.com\r\n" => &["CVR 2 1.0.0000 1.0.0000 7.0.0425 http://download.microsoft.com/download/D/F/B/DFB59A5D-92DF-4405-9767-43E3DF10D25B/fr/Install_MSN_Messenger.exe http://messenger.msn.com/fr\r\n".to_string()],
@@ -33,15 +36,20 @@ impl MockNS {
                             "PRP MFN Testing\r\n".to_string(),
                             "LSG Mock%20Contacts 124153dc-a695-4f6c-93e8-8e07c9775251\r\n".to_string(),
                             "LST N=bob@passport.com F=Bob C=6bd736b8-dc18-44c6-ad61-8cd12d641e79 13 124153dc-a695-4f6c-93e8-8e07c9775251\r\n".to_string(),
-                            "LST N=fred@passport.com F=Fred 8\r\n".to_string()],
+                            "LST N=fred@passport.com F=Fred 2\r\n".to_string()],
 
                         "GCF 6 Shields.xml\r\n" => &[Self::gcf_reply()],
-                        "CHG 7 NLN 1073741824\r\n" => &["CHG 7 NLN 1073741824\r\n".to_string()],
-                        "UUX 8 34\r\n<Data><PSM/><CurrentMedia/></Data>" => &["UUX 8 0\r\n".to_string()],
+                        "CHG 7 NLN 1073741824\r\n" => &["CHG 7 NLN 1073741824\r\n".to_string(),
+                                                        "ILN 7 NLN bob@passport.com Bob 1073741824 %3Cmsnobj%20Creator%3D%22\r\n".to_string(),
+                                                        "NLN NLN bob@passport.com Bob 1073741824 %3Cmsnobj%20Creator%3D%22\r\n".to_string(),
+                                                        "UBX bob@passport.com 70\r\n<Data><PSM>my msn all ducked</PSM><CurrentMedia></CurrentMedia></Data>".to_string()],
+                        
+                        "UUX 8 43\r\n<Data><PSM>test</PSM><CurrentMedia/></Data>" => &["UUX 8 0\r\n".to_string()],
                         _ => &[]
                     };
 
                     for reply in replies {
+                        trace!("S: {reply}");
                         wr.write_all(&reply.as_bytes())
                             .await
                             .expect("Could not write reply from Mock Notification Server");

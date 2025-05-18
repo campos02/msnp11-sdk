@@ -88,6 +88,10 @@ impl Client {
             .ok_or_else(|| ConnectionError::Disconnected)
     }
 
+    pub fn event_queue_size(&self) -> usize {
+        self.event_rx.len()
+    }
+
     pub async fn login(
         &mut self,
         email: String,
