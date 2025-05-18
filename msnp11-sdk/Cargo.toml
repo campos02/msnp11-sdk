@@ -1,0 +1,13 @@
+[package]
+name = "msnp11-sdk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "io-util", "net", "macros", "sync"] }
+base64 = "0.22.1"
+log = { version = "0.4.27", features = ["std"] }
+reqwest = "0.12.15"
+quick-xml = { version = "0.37.5", features = ["serialize"] }
+serde = { version = "1.0.219", features = ["derive"] }
+urlencoding = "2.1.3"
