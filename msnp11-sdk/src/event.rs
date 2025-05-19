@@ -18,7 +18,7 @@ pub enum Event {
 
     Group {
         name: String,
-        id: String,
+        guid: String,
     },
 
     Contact {
@@ -30,7 +30,7 @@ pub enum Event {
     ContactInForwardList {
         email: String,
         display_name: String,
-        id: String,
+        guid: String,
         lists: Vec<List>,
         groups: Vec<String>,
     },
@@ -46,5 +46,16 @@ pub enum Event {
         personal_message: PersonalMessage,
     },
 
+    ContactOffline {
+        email: String,
+    },
+
+    AddedBy {
+        email: String,
+        display_name: String,
+    },
+
+    RemovedBy(String),
+    LoggedInAnotherDevice,
     Disconnected,
 }

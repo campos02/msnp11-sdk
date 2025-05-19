@@ -44,7 +44,7 @@ pub fn match_event(base64_message: &String) -> Event {
             name: urlencoding::decode(args[1])
                 .expect("Could not url decode group name")
                 .to_string(),
-            id: args[2].to_string(),
+            guid: args[2].to_string(),
         },
 
         "LST" => {
@@ -86,7 +86,7 @@ pub fn match_event(base64_message: &String) -> Event {
                     display_name: urlencoding::decode(args[2].replace("F=", "").as_str())
                         .expect("Could not url decode contact name")
                         .to_string(),
-                    id: args[3].replace("C=", ""),
+                    guid: args[3].replace("C=", ""),
                     groups,
                     lists,
                 }
@@ -148,6 +148,41 @@ pub fn match_event(base64_message: &String) -> Event {
                 personal_message,
             }
         }
+
+        "FLN" => Event::ContactOffline {
+            email: args[1].to_string(),
+        },
+
+        "ADC" => {
+            if args[1] == "0" && args[2] == "RL" {
+                Event::AddedBy {
+                    email: args[3].replace("N=", ""),
+                    display_name: urlencoding::decode(args[4].replace("F=", "").as_str())
+                        .expect("Could not url decode contact display name")
+                        .to_string(),
+                }
+            } else {
+                Event::ServerReply
+            }
+        }
+
+        "REM" => {
+            if args[1] == "0" && args[2] == "RL" {
+                Event::RemovedBy(args[3].replace("N=", ""))
+            } else {
+                Event::ServerReply
+            }
+        }
+        
+        "OUT" => {
+            if args.len() > 1 {
+                if args[1] == "OTH" {
+                    return Event::LoggedInAnotherDevice;
+                }
+            }
+
+            Event::Disconnected
+        },
 
         _ => Event::ServerReply,
     }

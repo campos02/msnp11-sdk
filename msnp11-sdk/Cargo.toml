@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "io-util", "net", "macros", "sync"] }
+tokio = { version = "1", features = ["rt-multi-thread", "io-util", "net", "macros", "sync", "time"] }
 base64 = "0.22.1"
 log = { version = "0.4.27", features = ["std"] }
 reqwest = "0.12.15"

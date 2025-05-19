@@ -9,6 +9,7 @@ pub enum MsnpError {
     AuthenticationHeaderNotFound,
     CouldNotGetAuthenticationString,
     InvalidArgument,
+    InvalidContact,
 }
 
 impl fmt::Display for MsnpError {
@@ -30,6 +31,10 @@ impl fmt::Display for MsnpError {
 
             MsnpError::InvalidArgument => {
                 write!(f, "An invalid argument was sent")
+            }
+
+            MsnpError::InvalidContact => {
+                write!(f, "Command refers to an invalid contact")
             }
         }
     }

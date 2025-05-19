@@ -1,7 +1,7 @@
 use env_logger::Env;
-use msnp11_sdk::list::List;
-use msnp11_sdk::event::Event;
 use msnp11_sdk::client::Client;
+use msnp11_sdk::event::Event;
+use msnp11_sdk::list::List;
 use msnp11_sdk::models::personal_message::PersonalMessage;
 use msnp11_sdk::models::presence::Presence;
 
@@ -58,7 +58,7 @@ async fn login() {
             Event::Blp(blp) => assert_eq!(blp, "AL"),
             Event::DisplayName(display_name) => assert_eq!(display_name, "Testing"),
 
-            Event::Group { name, id } => {
+            Event::Group { name, guid: id } => {
                 assert_eq!(name, "Mock Contacts");
                 assert_eq!(id, "124153dc-a695-4f6c-93e8-8e07c9775251");
             }
@@ -66,13 +66,13 @@ async fn login() {
             Event::ContactInForwardList {
                 email,
                 display_name,
-                id,
+                guid,
                 lists,
                 groups,
             } => {
                 assert_eq!(email, "bob@passport.com");
                 assert_eq!(display_name, "Bob");
-                assert_eq!(id, "6bd736b8-dc18-44c6-ad61-8cd12d641e79");
+                assert_eq!(guid, "6bd736b8-dc18-44c6-ad61-8cd12d641e79");
                 assert_eq!(groups, vec!["124153dc-a695-4f6c-93e8-8e07c9775251"]);
                 assert_eq!(
                     lists,
@@ -90,22 +90,35 @@ async fn login() {
                 assert_eq!(lists, vec![List::AllowList])
             }
 
-            Event::PresenceUpdate { email, display_name, presence } => {
+            Event::PresenceUpdate {
+                email,
+                display_name,
+                presence,
+            } => {
                 assert_eq!(email, "bob@passport.com");
                 assert_eq!(display_name, "Bob");
-                assert_eq!(presence, Presence {
-                    presence: "NLN".to_string(),
-                    client_id: 1073741824,
-                    msn_object: Some("<msnobj Creator=\"".to_string())
-                });
+                assert_eq!(
+                    presence,
+                    Presence {
+                        presence: "NLN".to_string(),
+                        client_id: 1073741824,
+                        msn_object: Some("<msnobj Creator=\"".to_string())
+                    }
+                );
             }
 
-            Event::PersonalMessageUpdate { email, personal_message } => {
+            Event::PersonalMessageUpdate {
+                email,
+                personal_message,
+            } => {
                 assert_eq!(email, "bob@passport.com");
-                assert_eq!(personal_message, PersonalMessage {
-                    psm: "my msn all ducked".to_string(),
-                    current_media: "".to_string()
-                });
+                assert_eq!(
+                    personal_message,
+                    PersonalMessage {
+                        psm: "my msn all ducked".to_string(),
+                        current_media: "".to_string()
+                    }
+                );
             }
 
             _ => (),
