@@ -6,13 +6,8 @@ use crate::models::presence::Presence;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use core::str;
 
-pub fn match_event(base64_message: &String) -> Event {
-    let message_bytes = URL_SAFE
-        .decode(base64_message)
-        .expect("Could not decode socket message from base64");
-
-    let reply = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) }.to_string();
-    let command = reply
+pub fn into_event(message: &String) -> Event {
+    let command = message
         .lines()
         .next()
         .expect("Could not get command from server message")
@@ -126,19 +121,16 @@ pub fn match_event(base64_message: &String) -> Event {
                     .to_string(),
                 presence: Presence {
                     presence: args[base_index + 1].to_string(),
-                    client_id: args[base_index + 4]
-                        .to_string()
-                        .parse()
-                        .unwrap_or_else(|_| 0),
+                    client_id: args[base_index + 4].to_string().parse().unwrap_or(0),
                     msn_object,
                 },
             }
         }
 
         "UBX" => {
-            let payload = reply.replace(command.as_str(), "");
+            let payload = message.replace(command.as_str(), "");
             let personal_message =
-                quick_xml::de::from_str(payload.as_str()).unwrap_or_else(|_| PersonalMessage {
+                quick_xml::de::from_str(payload.as_str()).unwrap_or(PersonalMessage {
                     psm: "".to_string(),
                     current_media: "".to_string(),
                 });
@@ -173,7 +165,7 @@ pub fn match_event(base64_message: &String) -> Event {
                 Event::ServerReply
             }
         }
-        
+
         "OUT" => {
             if args.len() > 1 {
                 if args[1] == "OTH" {
@@ -182,13 +174,13 @@ pub fn match_event(base64_message: &String) -> Event {
             }
 
             Event::Disconnected
-        },
+        }
 
         _ => Event::ServerReply,
     }
 }
 
-pub fn match_internal_event(base64_message: &String) -> InternalEvent {
+pub fn into_internal_event(base64_message: &String) -> InternalEvent {
     let message_bytes = URL_SAFE
         .decode(base64_message)
         .expect("Could not decode socket message from base64");
@@ -203,6 +195,17 @@ pub fn match_internal_event(base64_message: &String) -> InternalEvent {
 
     let args: Vec<&str> = command.trim().split(' ').collect();
     match args[0] {
+        "RNG" => {
+            let server_and_port: Vec<&str> = args[2].trim().split(':').collect();
+
+            InternalEvent::SwitchboardInvitation {
+                server: server_and_port[0].to_string(),
+                port: server_and_port[1].to_string(),
+                session_id: args[1].to_string(),
+                cki_string: args[4].to_string(),
+            }
+        }
+
         _ => InternalEvent::ServerReply(reply),
     }
 }

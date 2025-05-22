@@ -15,3 +15,4 @@ pub mod usr_i;
 pub mod usr_s;
 pub mod uux;
 pub mod ver;
+pub mod xfr;

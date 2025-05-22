@@ -1,10 +1,10 @@
 pub mod client;
-mod commands;
 pub mod connection_error;
 pub mod event;
-mod event_matcher;
 mod internal_event;
 pub mod list;
 pub mod models;
 pub mod msnp_error;
+mod notification_server;
 mod passport_auth;
+mod switchboard;

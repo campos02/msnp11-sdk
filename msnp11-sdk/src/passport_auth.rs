@@ -33,7 +33,7 @@ impl PassportAuth {
 
     pub async fn get_passport_token(
         &self,
-        email: String,
+        email: &String,
         password: String,
         authorization_string: String,
     ) -> Result<String, Box<dyn Error>> {
@@ -46,7 +46,7 @@ impl PassportAuth {
         let authentication_info = response
             .headers()
             .get("Authentication-Info")
-            .ok_or_else(|| MsnpError::AuthenticationHeaderNotFound)?
+            .ok_or(MsnpError::AuthenticationHeaderNotFound)?
             .to_str()?;
 
         let token = authentication_info

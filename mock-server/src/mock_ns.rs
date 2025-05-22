@@ -46,6 +46,7 @@ impl MockNS {
                             "UBX bob@passport.com 70\r\n<Data><PSM>my msn all ducked</PSM><CurrentMedia></CurrentMedia></Data>".to_string()
                         ],
                         "UUX 8 43\r\n<Data><PSM>test</PSM><CurrentMedia/></Data>" => &["UUX 8 0\r\n".to_string()],
+                        "PNG\r\n" => &["QNG 60\r\n".to_string()],
                         _ => &[]
                     };
 
@@ -67,7 +68,7 @@ impl MockNS {
         );
         payload.push_str("</shield><block></block></config>");
 
-        let length = payload.as_bytes().len();
+        let length = payload.len();
         format!("GCF 6 Shields.xml {length}\r\n{payload}")
     }
 }

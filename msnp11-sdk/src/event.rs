@@ -1,5 +1,6 @@
 use crate::list::List;
 use crate::models::personal_message::PersonalMessage;
+use crate::models::plain_text::PlainText;
 use crate::models::presence::Presence;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -56,6 +57,23 @@ pub enum Event {
     },
 
     RemovedBy(String),
+
+    TextMessage {
+        session_id: String,
+        email: String,
+        message: PlainText,
+    },
+
+    Nudge {
+        session_id: String,
+        email: String,
+    },
+
+    TypingNotification {
+        session_id: String,
+        email: String,
+    },
+
     LoggedInAnotherDevice,
     Disconnected,
 }

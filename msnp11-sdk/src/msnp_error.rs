@@ -10,6 +10,10 @@ pub enum MsnpError {
     CouldNotGetAuthenticationString,
     InvalidArgument,
     InvalidContact,
+    MessageNotDelivered,
+    ContactIsOffline,
+    NotLoggedIn,
+    CouldNotGetParticipants,
 }
 
 impl fmt::Display for MsnpError {
@@ -35,6 +39,22 @@ impl fmt::Display for MsnpError {
 
             MsnpError::InvalidContact => {
                 write!(f, "Command refers to an invalid contact")
+            }
+
+            MsnpError::MessageNotDelivered => {
+                write!(f, "Message could not be delivered to all recipients")
+            }
+
+            MsnpError::ContactIsOffline => {
+                write!(f, "The contact you're trying to invite is offline")
+            }
+
+            MsnpError::NotLoggedIn => {
+                write!(f, "Please log in before using this command")
+            }
+
+            MsnpError::CouldNotGetParticipants => {
+                write!(f, "Could not get session participants")
             }
         }
     }
