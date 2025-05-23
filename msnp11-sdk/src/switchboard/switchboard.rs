@@ -135,6 +135,7 @@ impl Switchboard {
     }
 
     pub async fn invite(&mut self, email: &String) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let had_session_id = self.session_id.is_some();
         self.session_id =
             Some(Cal::send(&mut self.tr_id, &self.sb_tx, &self.internal_tx, email).await?);
 
@@ -143,7 +144,11 @@ impl Switchboard {
             .or(Err(MsnpError::CouldNotGetParticipants))?
             .insert(email.to_owned());
 
-        self.listen_to_internal_events()
+        if !had_session_id {
+            self.listen_to_internal_events()?;
+        }
+
+        Ok(())
     }
 
     pub fn get_session_id(&self) -> Option<String> {

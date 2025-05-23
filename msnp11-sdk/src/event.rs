@@ -74,6 +74,16 @@ pub enum Event {
         email: String,
     },
 
+    ParticipantInSwitchboard {
+        session_id: String,
+        email: String,
+    },
+
+    ParticipantLeftSwitchboard {
+        session_id: String,
+        email: String,
+    },
+
     LoggedInAnotherDevice,
     Disconnected,
 }

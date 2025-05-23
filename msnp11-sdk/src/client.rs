@@ -647,6 +647,23 @@ impl Client {
         switchboard.send_typing_user(user_email).await
     }
 
+    pub async fn invite_to_session(
+        &self,
+        email: &String,
+        session_id: &String,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let mut switchboards = self
+            .switchboards
+            .lock()
+            .or(Err(MsnpError::CouldNotInviteContact))?;
+
+        let switchboard = switchboards
+            .get_mut(session_id)
+            .ok_or(MsnpError::CouldNotInviteContact)?;
+
+        switchboard.invite(email).await
+    }
+
     pub async fn disconnect(&self) -> Result<(), SendError<Vec<u8>>> {
         let command = "OUT\r\n";
         trace!("C: {command}");

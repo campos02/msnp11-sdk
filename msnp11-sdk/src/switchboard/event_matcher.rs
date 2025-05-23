@@ -53,6 +53,21 @@ pub fn into_event(message: &String, session_id: &String) -> Event {
             Event::ServerReply
         }
 
+        "JOI" => Event::ParticipantInSwitchboard {
+            session_id: session_id.to_owned(),
+            email: args[1].to_string(),
+        },
+
+        "IRO" => Event::ParticipantInSwitchboard {
+            session_id: session_id.to_owned(),
+            email: args[4].to_string(),
+        },
+
+        "BYE" => Event::ParticipantLeftSwitchboard {
+            session_id: session_id.to_owned(),
+            email: args[1].to_string(),
+        },
+
         _ => Event::ServerReply,
     }
 }

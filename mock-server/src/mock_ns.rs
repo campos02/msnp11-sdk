@@ -1,3 +1,4 @@
+use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use core::str;
 use log::trace;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -21,54 +22,94 @@ impl MockNS {
                         break;
                     }
 
-                    let message = unsafe { str::from_utf8_unchecked(&buf[..received]) };
-                    trace!("C: {message}");
+                    let mut messages_bytes = buf[..received].to_vec();
+                    let mut base64_messages: Vec<String> = Vec::new();
 
-                    let replies: &[String] = match message {
-                        "VER 1 MSNP11 CVR0\r\n" => &["VER 1 MSNP11\r\n".to_string()],
-                        "CVR 2 0x0409 winnt 10 i386 msnp11-sdk 0.01 msmsgs testing@example.com\r\n" => &["CVR 2 1.0.0000 1.0.0000 7.0.0425 http://download.microsoft.com/download/D/F/B/DFB59A5D-92DF-4405-9767-43E3DF10D25B/fr/Install_MSN_Messenger.exe http://messenger.msn.com/fr\r\n".to_string()],
-                        "USR 3 TWN I testing@example.com\r\n" => &["USR 3 TWN S ct=1,rver=1,wp=FS_40SEC_0_COMPACT,lc=1,id=1\r\n".to_string()],
-                        "USR 4 TWN S aaa123aaa123\r\n" => &["USR 4 OK testing@example.com Testing 1 0\r\n".to_string()],
-                        "SYN 5 0 0\r\n" =>
-                            &["SYN 5 0 0 2 1\r\n".to_string(),
-                            "GTC A\r\n".to_string(),
-                            "BLP AL\r\n".to_string(),
-                            "PRP MFN Testing\r\n".to_string(),
-                            "LSG Mock%20Contacts 124153dc-a695-4f6c-93e8-8e07c9775251\r\n".to_string(),
-                            "LST N=bob@passport.com F=Bob C=6bd736b8-dc18-44c6-ad61-8cd12d641e79 13 124153dc-a695-4f6c-93e8-8e07c9775251\r\n".to_string(),
-                            "LST N=fred@passport.com F=Fred 2\r\n".to_string()],
+                    loop {
+                        let messages_string = unsafe { str::from_utf8_unchecked(&messages_bytes) };
+                        let messages: Vec<String> = messages_string
+                            .lines()
+                            .map(|line| line.to_string() + "\r\n")
+                            .collect();
 
-                        "GCF 6 Shields.xml\r\n" => &[Self::gcf_reply()],
-                        "CHG 7 NLN 1073741824\r\n" => 
-                            &["CHG 7 NLN 1073741824\r\n".to_string(),
-                            "ILN 7 NLN bob@passport.com Bob 1073741824 %3Cmsnobj%20Creator%3D%22\r\n".to_string(),
-                            "NLN NLN bob@passport.com Bob 1073741824 %3Cmsnobj%20Creator%3D%22\r\n".to_string(),
-                            "UBX bob@passport.com 70\r\n<Data><PSM>my msn all ducked</PSM><CurrentMedia></CurrentMedia></Data>".to_string()
-                        ],
-                        "UUX 8 43\r\n<Data><PSM>test</PSM><CurrentMedia/></Data>" => &["UUX 8 0\r\n".to_string()],
-                        "PNG\r\n" => &["QNG 60\r\n".to_string()],
-                        _ => &[]
-                    };
+                        if messages.len() == 0 {
+                            break;
+                        }
 
-                    for reply in replies {
-                        trace!("S: {reply}");
-                        wr.write_all(&reply.as_bytes())
-                            .await
-                            .expect("Could not write reply from Mock Notification Server");
+                        let args: Vec<&str> = messages[0].trim().split(' ').collect();
+                        match args[0] {
+                            "UUX" => {
+                                let length = args[2].parse::<usize>().unwrap();
+                                let length = messages[0].len() + length;
+
+                                let new_bytes = messages_bytes[..length].to_vec();
+                                messages_bytes = messages_bytes[length..].to_vec();
+
+                                let base64_message = URL_SAFE.encode(&new_bytes);
+                                base64_messages.push(base64_message);
+                            }
+
+                            _ => {
+                                let new_bytes = messages_bytes[..messages[0].len()].to_vec();
+                                messages_bytes = messages_bytes[messages[0].len()..].to_vec();
+
+                                let base64_message = URL_SAFE.encode(&new_bytes);
+                                base64_messages.push(base64_message);
+                            }
+                        }
+                    }
+
+                    for base64_message in base64_messages {
+                        let message_bytes = URL_SAFE.decode(base64_message).unwrap();
+                        let message = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) };
+                        trace!("C: {message}");
+
+                        let replies: &[&str] = match message {
+                            "VER 1 MSNP11 CVR0\r\n" => &["VER 1 MSNP11\r\n"],
+                            "CVR 2 0x0409 winnt 10 i386 msnp11-sdk 0.01 msmsgs testing@example.com\r\n" => {
+                                &["CVR 2 1.0.0000 1.0.0000 7.0.0425\r\n"]
+                            }
+                            "USR 3 TWN I testing@example.com\r\n" => {
+                                &["USR 3 TWN S ct=1,rver=1,wp=FS_40SEC_0_COMPACT,lc=1,id=1\r\n"]
+                            }
+                            "USR 4 TWN S aaa123aaa123\r\n" => {
+                                &["USR 4 OK testing@example.com Testing 1 0\r\n"]
+                            }
+                            "SYN 5 0 0\r\n" => &[
+                                "SYN 5 0 0 2 1\r\n",
+                                "GTC A\r\n",
+                                "BLP AL\r\n",
+                                "PRP MFN Testing\r\n",
+                                "LSG Mock%20Contacts 124153dc-a695-4f6c-93e8-8e07c9775251\r\n",
+                                "LST N=bob@passport.com F=Bob C=6bd736b8-dc18-44c6-ad61-8cd12d641e79 13 124153dc-a695-4f6c-93e8-8e07c9775251\r\n",
+                                "LST N=fred@passport.com F=Fred 2\r\n",
+                            ],
+
+                            "GCF 6 Shields.xml\r\n" => {
+                                &["GCF 6 Shields.xml 33\r\n</shield><block></block></config>"]
+                            }
+                            "CHG 7 NLN 1073741824\r\n" => &[
+                                "CHG 7 NLN 1073741824\r\n",
+                                "ILN 7 NLN bob@passport.com Bob 1073741824 %3Cmsnobj%20Creator%3D%22\r\n",
+                                "NLN NLN bob@passport.com Bob 1073741824 %3Cmsnobj%20Creator%3D%22\r\n",
+                                "UBX bob@passport.com 70\r\n<Data><PSM>my msn all ducked</PSM><CurrentMedia></CurrentMedia></Data>",
+                            ],
+                            "UUX 8 43\r\n<Data><PSM>test</PSM><CurrentMedia/></Data>" => {
+                                &["UUX 8 0\r\n"]
+                            }
+                            "PNG\r\n" => &["QNG 60\r\n"],
+                            _ => &[],
+                        };
+
+                        for reply in replies {
+                            trace!("S: {reply}");
+                            wr.write_all(&reply.as_bytes())
+                                .await
+                                .expect("Could not write reply from Mock Notification Server");
+                        }
                     }
                 }
             }
         });
-    }
-
-    fn gcf_reply() -> String {
-        let mut payload = r#"<?xml version= "1.0" encoding="utf-8" ?>"#.to_string();
-        payload.push_str(
-            r#"<config><shield><cli maj="7" min="0" minbld="0" maxbld="9999" deny=" " />"#,
-        );
-        payload.push_str("</shield><block></block></config>");
-
-        let length = payload.len();
-        format!("GCF 6 Shields.xml {length}\r\n{payload}")
     }
 }

@@ -14,6 +14,7 @@ pub enum MsnpError {
     ContactIsOffline,
     NotLoggedIn,
     CouldNotGetParticipants,
+    CouldNotInviteContact,
 }
 
 impl fmt::Display for MsnpError {
@@ -55,6 +56,10 @@ impl fmt::Display for MsnpError {
 
             MsnpError::CouldNotGetParticipants => {
                 write!(f, "Could not get session participants")
+            }
+
+            MsnpError::CouldNotInviteContact => {
+                write!(f, "Could not invite contact to session")
             }
         }
     }
