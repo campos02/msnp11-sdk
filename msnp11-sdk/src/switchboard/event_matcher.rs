@@ -1,8 +1,11 @@
 use crate::event::Event;
 use crate::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
-use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+use crate::switchboard::p2p::binary_header::BinaryHeader;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
+use deku::DekuContainerRead;
+use std::io::Cursor;
 
 pub fn into_event(message: &String, session_id: &String) -> Event {
     let command = message
@@ -30,7 +33,6 @@ pub fn into_event(message: &String, session_id: &String) -> Event {
 
             if content_type.contains("text/x-msnmsgr-datacast") {
                 let text = payload.split("\r\n\r\n").nth(1).unwrap_or("");
-
                 if text == "ID: 1" {
                     return Event::Nudge {
                         session_id: session_id.to_owned(),
@@ -73,7 +75,7 @@ pub fn into_event(message: &String, session_id: &String) -> Event {
 }
 
 pub fn into_internal_event(base64_message: &String) -> InternalEvent {
-    let message_bytes = URL_SAFE
+    let message_bytes = STANDARD
         .decode(base64_message)
         .expect("Could not decode socket message from base64");
 
@@ -87,7 +89,68 @@ pub fn into_internal_event(base64_message: &String) -> InternalEvent {
 
     let args: Vec<&str> = command.trim().split(' ').collect();
     match args[0] {
-        "MSG" => InternalEvent::ServerReply(reply),
+        "MSG" => {
+            let payload = reply.replace(command.as_str(), "");
+            let Some(content_type) = payload.lines().nth(1) else {
+                return InternalEvent::ServerReply(reply);
+            };
+
+            if content_type == "Content-Type: application/x-msnmsgrp2p" {
+                let Some(destination) = payload.lines().find(|line| line.contains("P2P-Dest: "))
+                else {
+                    return InternalEvent::ServerReply(reply);
+                };
+
+                let destination = destination.replace("P2P-Dest: ", "");
+                let msg_headers = payload.split("\r\n\r\n").collect::<Vec<&str>>()[0];
+                let message_bytes = message_bytes
+                    [(command.len() + msg_headers.len() + "\r\n\r\n".len())..]
+                    .to_vec();
+
+                let binary_header = message_bytes[..48].to_vec();
+                let mut cursor = Cursor::new(binary_header);
+                let Ok((_, binary_header)) = BinaryHeader::from_reader((&mut cursor, 0)) else {
+                    return InternalEvent::ServerReply(reply);
+                };
+
+                if binary_header.flag == 0x20 {
+                    return InternalEvent::P2PData {
+                        destination,
+                        message: message_bytes,
+                    };
+                }
+
+                if binary_header.total_data_size == 4 && message_bytes[48..52].eq(&[0; 4]) {
+                    return InternalEvent::P2PDataPreparation {
+                        destination,
+                        message: message_bytes,
+                    };
+                }
+
+                if payload.contains("INVITE") {
+                    return InternalEvent::P2PInvite {
+                        destination,
+                        message: message_bytes,
+                    };
+                }
+
+                if payload.contains("200 OK") {
+                    return InternalEvent::P2POk {
+                        destination,
+                        message: message_bytes,
+                    };
+                }
+
+                if payload.contains("BYE") {
+                    return InternalEvent::P2PBye {
+                        destination,
+                        message: message_bytes,
+                    };
+                }
+            }
+
+            InternalEvent::ServerReply(reply)
+        }
         _ => InternalEvent::ServerReply(reply),
     }
 }

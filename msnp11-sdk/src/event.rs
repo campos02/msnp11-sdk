@@ -84,6 +84,11 @@ pub enum Event {
         email: String,
     },
 
+    DisplayPicture {
+        email: String,
+        data: Vec<u8>,
+    },
+
     LoggedInAnotherDevice,
     Disconnected,
 }

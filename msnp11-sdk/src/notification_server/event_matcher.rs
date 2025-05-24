@@ -3,7 +3,7 @@ use crate::internal_event::InternalEvent;
 use crate::list::List;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
-use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 
 pub fn into_event(message: &String) -> Event {
@@ -181,7 +181,7 @@ pub fn into_event(message: &String) -> Event {
 }
 
 pub fn into_internal_event(base64_message: &String) -> InternalEvent {
-    let message_bytes = URL_SAFE
+    let message_bytes = STANDARD
         .decode(base64_message)
         .expect("Could not decode socket message from base64");
 

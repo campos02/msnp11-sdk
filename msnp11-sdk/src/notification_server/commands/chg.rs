@@ -22,8 +22,12 @@ impl Chg {
             "CHG {tr_id} {} {}\r\n",
             presence.presence, presence.client_id
         );
+
         if let Some(msn_object) = &presence.msn_object {
-            command = command.replace("\r\n", format!(" {msn_object}\r\n").as_str());
+            command = command.replace(
+                "\r\n",
+                format!(" {}\r\n", urlencoding::encode(msn_object).to_string()).as_str(),
+            );
         }
 
         ns_tx.send(command.as_bytes().to_vec()).await?;

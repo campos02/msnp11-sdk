@@ -14,6 +14,9 @@ impl Xfr {
         ns_tx: &mpsc::Sender<Vec<u8>>,
         event_tx: &mpsc::Sender<Event>,
         internal_tx: &broadcast::Sender<InternalEvent>,
+        display_picture: &Option<Vec<u8>>,
+        msn_object: &Option<String>,
+        user_email: &String,
     ) -> Result<Switchboard, Box<dyn Error + Send + Sync>> {
         let mut internal_rx = internal_tx.subscribe();
 
@@ -38,6 +41,9 @@ impl Xfr {
                             args[5],
                             event_tx.clone(),
                             internal_tx.clone(),
+                            display_picture.clone(),
+                            msn_object.clone(),
+                            user_email.clone(),
                         )
                         .await;
                     }

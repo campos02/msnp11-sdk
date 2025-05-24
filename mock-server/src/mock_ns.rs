@@ -1,4 +1,4 @@
-use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use log::trace;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -45,7 +45,7 @@ impl MockNS {
                                 let new_bytes = messages_bytes[..length].to_vec();
                                 messages_bytes = messages_bytes[length..].to_vec();
 
-                                let base64_message = URL_SAFE.encode(&new_bytes);
+                                let base64_message = STANDARD.encode(&new_bytes);
                                 base64_messages.push(base64_message);
                             }
 
@@ -53,14 +53,14 @@ impl MockNS {
                                 let new_bytes = messages_bytes[..messages[0].len()].to_vec();
                                 messages_bytes = messages_bytes[messages[0].len()..].to_vec();
 
-                                let base64_message = URL_SAFE.encode(&new_bytes);
+                                let base64_message = STANDARD.encode(&new_bytes);
                                 base64_messages.push(base64_message);
                             }
                         }
                     }
 
                     for base64_message in base64_messages {
-                        let message_bytes = URL_SAFE.decode(base64_message).unwrap();
+                        let message_bytes = STANDARD.decode(base64_message).unwrap();
                         let message = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) };
                         trace!("C: {message}");
 

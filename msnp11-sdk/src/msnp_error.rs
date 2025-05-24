@@ -15,6 +15,8 @@ pub enum MsnpError {
     NotLoggedIn,
     CouldNotGetParticipants,
     CouldNotInviteContact,
+    P2PInviteError,
+    CouldNotGetDisplayPicture,
 }
 
 impl fmt::Display for MsnpError {
@@ -60,6 +62,14 @@ impl fmt::Display for MsnpError {
 
             MsnpError::CouldNotInviteContact => {
                 write!(f, "Could not invite contact to session")
+            }
+
+            MsnpError::P2PInviteError => {
+                write!(f, "P2P session kind not supported")
+            }
+
+            MsnpError::CouldNotGetDisplayPicture => {
+                write!(f, "Could not get contact display picture")
             }
         }
     }

@@ -27,7 +27,7 @@ use crate::notification_server::commands::xfr::Xfr;
 use crate::notification_server::event_matcher::{into_event, into_internal_event};
 use crate::passport_auth::PassportAuth;
 use crate::switchboard::switchboard::Switchboard;
-use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use log::trace;
 use std::collections::HashMap;
@@ -48,6 +48,8 @@ pub struct Client {
     tr_id: usize,
     user_email: Option<String>,
     switchboards: Arc<Mutex<HashMap<String, Switchboard>>>,
+    display_picture: Option<Vec<u8>>,
+    msn_object: Option<String>,
 }
 
 impl Client {
@@ -94,6 +96,8 @@ impl Client {
             tr_id: 0,
             user_email: None,
             switchboards: Arc::new(Mutex::new(HashMap::new())),
+            display_picture: None,
+            msn_object: None,
         })
     }
 
@@ -161,7 +165,7 @@ impl Client {
                     let new_bytes = messages_bytes[..length].to_vec();
                     messages_bytes = messages_bytes[length..].to_vec();
 
-                    let base64_message = URL_SAFE.encode(&new_bytes);
+                    let base64_message = STANDARD.encode(&new_bytes);
                     base64_messages.push(base64_message);
                 }
 
@@ -169,7 +173,7 @@ impl Client {
                     let new_bytes = messages_bytes[..messages[0].len()].to_vec();
                     messages_bytes = messages_bytes[messages[0].len()..].to_vec();
 
-                    let base64_message = URL_SAFE.encode(&new_bytes);
+                    let base64_message = STANDARD.encode(&new_bytes);
                     base64_messages.push(base64_message);
                 }
             }
@@ -222,6 +226,8 @@ impl Client {
         let mut internal_rx = internal_tx.subscribe();
         let switchboards = self.switchboards.clone();
         let event_tx = self.event_tx.clone();
+        let display_picture = self.display_picture.clone();
+        let msn_object = self.msn_object.clone();
 
         tokio::spawn(async move {
             while let Ok(event) = internal_rx.recv().await {
@@ -246,6 +252,9 @@ impl Client {
                             cki_string.as_str(),
                             event_tx.clone(),
                             internal_tx.clone(),
+                            display_picture.clone(),
+                            msn_object.clone(),
+                            user_email.clone(),
                         )
                         .await;
 
@@ -477,6 +486,9 @@ impl Client {
                 &self.ns_tx,
                 &self.event_tx,
                 &self.internal_tx,
+                &self.display_picture,
+                &self.msn_object,
+                &user_email,
             )
             .await?;
 
@@ -526,6 +538,9 @@ impl Client {
                 &self.ns_tx,
                 &self.event_tx,
                 &self.internal_tx,
+                &self.display_picture,
+                &self.msn_object,
+                &user_email,
             )
             .await?;
 
@@ -578,6 +593,9 @@ impl Client {
                 &self.ns_tx,
                 &self.event_tx,
                 &self.internal_tx,
+                &self.display_picture,
+                &self.msn_object,
+                &user_email,
             )
             .await?;
 
@@ -664,10 +682,54 @@ impl Client {
         switchboard.invite(email).await
     }
 
+    pub fn set_display_picture(&mut self, display_picture: Vec<u8>) -> Result<(), Box<dyn Error>> {
+        let user_email = self.user_email.clone().ok_or(MsnpError::InvalidArgument)?;
+
+        let mut hash = sha1_smol::Sha1::new();
+        hash.update(display_picture.as_slice());
+        let sha1d = STANDARD.encode(hash.digest().to_string());
+
+        let sha1c = format!(
+            "Creator{user_email}Size{}Type3LocationPIC.tmpFriendlyAAA=SHA1D{sha1d}",
+            display_picture.len()
+        );
+
+        let mut hash = sha1_smol::Sha1::new();
+        hash.update(sha1c.as_bytes());
+        let sha1c = STANDARD.encode(hash.digest().to_string());
+
+        self.msn_object = Some(format!(
+            "<msnobj Creator=\"{user_email}\" Size=\"{}\" Type=\"3\" Location=\"PIC.tmp\" Friendly=\"AAA=\" SHA1D=\"{sha1d}\" SHA1C=\"{sha1c}\"/>",
+            display_picture.len()
+        ));
+
+        self.display_picture = Some(display_picture.clone());
+        Ok(())
+    }
+
+    pub async fn request_contact_display_picture(
+        &self,
+        email: &String,
+        msn_object: &String,
+        session_id: &String,
+    ) -> Result<(), Box<dyn Error>> {
+        let mut switchboards = self
+            .switchboards
+            .lock()
+            .or(Err(MsnpError::CouldNotGetDisplayPicture))?;
+
+        let switchboard = switchboards
+            .get_mut(session_id)
+            .ok_or(MsnpError::CouldNotGetDisplayPicture)?;
+
+        switchboard
+            .request_contact_display_picture(email, msn_object)
+            .await
+    }
+
     pub async fn disconnect(&self) -> Result<(), SendError<Vec<u8>>> {
         let command = "OUT\r\n";
         trace!("C: {command}");
-
         self.ns_tx.send(command.as_bytes().to_vec()).await
     }
 }
