@@ -2,8 +2,9 @@ use crate::list::List;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::plain_text::PlainText;
 use crate::models::presence::Presence;
+use crate::switchboard::switchboard::Switchboard;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum Event {
     ServerReply,
 
@@ -57,30 +58,26 @@ pub enum Event {
     },
 
     RemovedBy(String),
+    SessionAnswered(Switchboard),
 
     TextMessage {
-        session_id: String,
         email: String,
         message: PlainText,
     },
 
     Nudge {
-        session_id: String,
         email: String,
     },
 
     TypingNotification {
-        session_id: String,
         email: String,
     },
 
     ParticipantInSwitchboard {
-        session_id: String,
         email: String,
     },
 
     ParticipantLeftSwitchboard {
-        session_id: String,
         email: String,
     },
 

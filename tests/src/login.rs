@@ -1,4 +1,3 @@
-
 #[tokio::test]
 async fn login() {
     let mut client = msnp11_sdk::client::Client::new("127.0.0.1".to_string(), "1863".to_string())
@@ -30,13 +29,9 @@ async fn login() {
         _ => msnp11_sdk::event::Event::Disconnected,
     };
 
-    assert_eq!(result, msnp11_sdk::event::Event::Authenticated);
+    assert!(matches!(result, msnp11_sdk::event::Event::Authenticated));
 
-    client
-        .set_presence(&msnp11_sdk::models::presence::Presence::new("NLN".to_string(), None))
-        .await
-        .unwrap();
-
+    client.set_presence("NLN".to_string()).await.unwrap();
     client
         .set_personal_message(&msnp11_sdk::models::personal_message::PersonalMessage {
             psm: "test".to_string(),
@@ -45,12 +40,14 @@ async fn login() {
         .await
         .unwrap();
 
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    assert!(client.event_queue_size() >= 8);
     for _ in 0..client.event_queue_size() {
         match client.receive_event().await.unwrap() {
             msnp11_sdk::event::Event::Gtc(gtc) => assert_eq!(gtc, "A"),
             msnp11_sdk::event::Event::Blp(blp) => assert_eq!(blp, "AL"),
-            msnp11_sdk::event::Event::DisplayName(display_name) => assert_eq!(display_name, "Testing"),
+            msnp11_sdk::event::Event::DisplayName(display_name) => {
+                assert_eq!(display_name, "Testing")
+            }
 
             msnp11_sdk::event::Event::Group { name, guid: id } => {
                 assert_eq!(name, "Mock Contacts");
@@ -70,7 +67,11 @@ async fn login() {
                 assert_eq!(groups, vec!["124153dc-a695-4f6c-93e8-8e07c9775251"]);
                 assert_eq!(
                     lists,
-                    vec![msnp11_sdk::list::List::ForwardList, msnp11_sdk::list::List::BlockList, msnp11_sdk::list::List::ReverseList]
+                    vec![
+                        msnp11_sdk::list::List::ForwardList,
+                        msnp11_sdk::list::List::BlockList,
+                        msnp11_sdk::list::List::ReverseList
+                    ]
                 )
             }
 

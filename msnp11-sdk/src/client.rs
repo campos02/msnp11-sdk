@@ -3,7 +3,6 @@ use crate::event::Event;
 use crate::internal_event::InternalEvent;
 use crate::list::List;
 use crate::models::personal_message::PersonalMessage;
-use crate::models::plain_text::PlainText;
 use crate::models::presence::Presence;
 use crate::msnp_error::MsnpError;
 use crate::notification_server::commands::adc::Adc;
@@ -30,13 +29,12 @@ use crate::switchboard::switchboard::Switchboard;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use log::trace;
-use std::collections::HashMap;
 use std::error::Error;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::net::{TcpStream, lookup_host};
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{broadcast, mpsc};
 
 pub struct Client {
@@ -46,7 +44,6 @@ pub struct Client {
     internal_tx: broadcast::Sender<InternalEvent>,
     tr_id: usize,
     user_email: Option<String>,
-    switchboards: Arc<Mutex<HashMap<String, Switchboard>>>,
     display_picture: Option<Vec<u8>>,
     msn_object: Option<String>,
 }
@@ -94,7 +91,6 @@ impl Client {
             internal_tx,
             tr_id: 0,
             user_email: None,
-            switchboards: Arc::new(Mutex::new(HashMap::new())),
             display_picture: None,
             msn_object: None,
         })
@@ -216,14 +212,11 @@ impl Client {
         });
     }
 
-    fn listen_to_internal_events(&self) -> Result<(), Box<dyn Error>> {
-        let Some(user_email) = self.user_email.clone() else {
-            return Err(MsnpError::NotLoggedIn.into());
-        };
-
-        let internal_tx = self.internal_tx.clone();
-        let mut internal_rx = internal_tx.subscribe();
-        let switchboards = self.switchboards.clone();
+    fn listen_to_internal_events(
+        &self,
+        mut internal_rx: broadcast::Receiver<InternalEvent>,
+    ) -> Result<(), Box<dyn Error>> {
+        let user_email = self.user_email.clone().ok_or(MsnpError::NotLoggedIn)?;
         let event_tx = self.event_tx.clone();
         let display_picture = self.display_picture.clone();
         let msn_object = self.msn_object.clone();
@@ -249,8 +242,6 @@ impl Client {
                             server.as_str(),
                             port.as_str(),
                             cki_string.as_str(),
-                            event_tx.clone(),
-                            internal_tx.clone(),
                             display_picture.clone(),
                             msn_object.clone(),
                             user_email.clone(),
@@ -263,9 +254,7 @@ impl Client {
                                 .await
                                 .is_ok()
                             {
-                                if let Ok(mut switchboards) = switchboards.lock() {
-                                    switchboards.insert(session_id.clone(), switchboard);
-                                }
+                                let _ = event_tx.send(Event::SessionAnswered(switchboard)).await;
                             }
                         }
                     }
@@ -284,6 +273,9 @@ impl Client {
         password: String,
         nexus_url: String,
     ) -> Result<Event, Box<dyn Error>> {
+        // Subscribe first so no events are missed
+        let internal_rx = self.internal_tx.subscribe();
+
         Ver::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx).await?;
         Cvr::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, &email).await?;
 
@@ -303,18 +295,20 @@ impl Client {
             .await?;
 
         UsrS::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, &token).await?;
-        Syn::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx).await?;
-        Gcf::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx).await?;
 
         self.user_email = Some(email);
-        self.listen_to_internal_events()?;
+        self.listen_to_internal_events(internal_rx)?;
         self.start_pinging();
+
+        Syn::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx).await?;
+        Gcf::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx).await?;
 
         Ok(Event::Authenticated)
     }
 
-    pub async fn set_presence(&mut self, presence: &Presence) -> Result<(), Box<dyn Error>> {
-        Chg::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, presence).await
+    pub async fn set_presence(&mut self, presence: String) -> Result<(), Box<dyn Error>> {
+        let presence = Presence::new(presence, self.msn_object.clone());
+        Chg::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, &presence).await
     }
 
     pub async fn set_personal_message(
@@ -490,241 +484,28 @@ impl Client {
         Blp::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, blp).await
     }
 
-    pub async fn send_text_message(
-        &mut self,
-        message: &PlainText,
-        email: &String,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let Some(user_email) = &self.user_email else {
-            return Err(MsnpError::NotLoggedIn.into());
-        };
-
-        let mut switchboards = self
-            .switchboards
-            .lock()
-            .or(Err(MsnpError::MessageNotDelivered))?;
-
-        let switchboard = switchboards.values_mut().find(|switchboard| {
-            let Ok(participants) = switchboard.get_participants() else {
-                return false;
-            };
-
-            participants.len() == 1 && participants.contains(user_email)
-                || participants.len() == 2
-                    && participants.contains(user_email)
-                    && participants.contains(email)
-        });
-
-        if let Some(switchboard) = switchboard {
-            if switchboard.get_participants()?.len() == 1 {
-                switchboard.invite(email).await?;
-            }
-
-            switchboard.send_text_message(message).await
-        } else {
-            let mut switchboard = Xfr::send(
-                &mut self.tr_id,
-                &self.ns_tx,
-                &self.event_tx,
-                &self.internal_tx,
-                &self.display_picture,
-                &self.msn_object,
-                &user_email,
-            )
-            .await?;
-
-            switchboard.login(user_email).await?;
-            switchboard.invite(email).await?;
-            switchboard.send_text_message(message).await?;
-
-            let session_id = switchboard
-                .get_session_id()
-                .ok_or(MsnpError::MessageNotDelivered)?;
-
-            switchboards.insert(session_id, switchboard);
-            Ok(())
-        }
-    }
-
-    pub async fn send_nudge(&mut self, email: &String) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let Some(user_email) = &self.user_email else {
-            return Err(MsnpError::NotLoggedIn.into());
-        };
-
-        let mut switchboards = self
-            .switchboards
-            .lock()
-            .or(Err(MsnpError::MessageNotDelivered))?;
-
-        let switchboard = switchboards.values_mut().find(|switchboard| {
-            let Ok(participants) = switchboard.get_participants() else {
-                return false;
-            };
-
-            participants.len() == 1 && participants.contains(user_email)
-                || participants.len() == 2
-                    && participants.contains(user_email)
-                    && participants.contains(email)
-        });
-
-        if let Some(switchboard) = switchboard {
-            if switchboard.get_participants()?.len() == 1 {
-                switchboard.invite(email).await?;
-            }
-
-            switchboard.send_nudge().await
-        } else {
-            let mut switchboard = Xfr::send(
-                &mut self.tr_id,
-                &self.ns_tx,
-                &self.event_tx,
-                &self.internal_tx,
-                &self.display_picture,
-                &self.msn_object,
-                &user_email,
-            )
-            .await?;
-
-            switchboard.login(user_email).await?;
-            switchboard.invite(email).await?;
-            switchboard.send_nudge().await?;
-
-            let session_id = switchboard
-                .get_session_id()
-                .ok_or(MsnpError::MessageNotDelivered)?;
-
-            switchboards.insert(session_id, switchboard);
-            Ok(())
-        }
-    }
-
-    pub async fn send_typing_user(
+    pub async fn create_session(
         &mut self,
         email: &String,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let Some(user_email) = &self.user_email else {
-            return Err(MsnpError::NotLoggedIn.into());
-        };
+    ) -> Result<Switchboard, Box<dyn Error + Send + Sync>> {
+        let user_email = self.user_email.clone().ok_or(MsnpError::NotLoggedIn)?;
+        let mut switchboard = Xfr::send(
+            &mut self.tr_id,
+            &self.ns_tx,
+            &self.internal_tx,
+            &self.display_picture,
+            &self.msn_object,
+            &user_email,
+        )
+        .await?;
 
-        let mut switchboards = self
-            .switchboards
-            .lock()
-            .or(Err(MsnpError::MessageNotDelivered))?;
-
-        let switchboard = switchboards.values_mut().find(|switchboard| {
-            let Ok(participants) = switchboard.get_participants() else {
-                return false;
-            };
-
-            participants.len() == 1 && participants.contains(user_email)
-                || participants.len() == 2
-                    && participants.contains(user_email)
-                    && participants.contains(email)
-        });
-
-        if let Some(switchboard) = switchboard {
-            if switchboard.get_participants()?.len() == 1 {
-                switchboard.invite(email).await?;
-            }
-
-            switchboard.send_typing_user(user_email).await
-        } else {
-            let mut switchboard = Xfr::send(
-                &mut self.tr_id,
-                &self.ns_tx,
-                &self.event_tx,
-                &self.internal_tx,
-                &self.display_picture,
-                &self.msn_object,
-                &user_email,
-            )
-            .await?;
-
-            switchboard.login(user_email).await?;
-            switchboard.invite(email).await?;
-            switchboard.send_typing_user(user_email).await?;
-
-            let session_id = switchboard
-                .get_session_id()
-                .ok_or(MsnpError::MessageNotDelivered)?;
-
-            switchboards.insert(session_id, switchboard);
-            Ok(())
-        }
-    }
-
-    pub async fn send_text_message_to_session(
-        &self,
-        message: &PlainText,
-        session_id: &String,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let switchboards = self
-            .switchboards
-            .lock()
-            .or(Err(MsnpError::MessageNotDelivered))?;
-
-        let switchboard = switchboards
-            .get(session_id)
-            .ok_or(MsnpError::MessageNotDelivered)?;
-
-        switchboard.send_text_message(message).await
-    }
-
-    pub async fn send_nudge_to_session(
-        &self,
-        session_id: &String,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let switchboards = self
-            .switchboards
-            .lock()
-            .or(Err(MsnpError::MessageNotDelivered))?;
-
-        let switchboard = switchboards
-            .get(session_id)
-            .ok_or(MsnpError::MessageNotDelivered)?;
-
-        switchboard.send_nudge().await
-    }
-
-    pub async fn send_typing_user_to_session(
-        &self,
-        session_id: &String,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let Some(user_email) = &self.user_email else {
-            return Err(MsnpError::NotLoggedIn.into());
-        };
-
-        let switchboards = self
-            .switchboards
-            .lock()
-            .or(Err(MsnpError::MessageNotDelivered))?;
-
-        let switchboard = switchboards
-            .get(session_id)
-            .ok_or(MsnpError::MessageNotDelivered)?;
-
-        switchboard.send_typing_user(user_email).await
-    }
-
-    pub async fn invite_to_session(
-        &self,
-        email: &String,
-        session_id: &String,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut switchboards = self
-            .switchboards
-            .lock()
-            .or(Err(MsnpError::CouldNotInviteContact))?;
-
-        let switchboard = switchboards
-            .get_mut(session_id)
-            .ok_or(MsnpError::CouldNotInviteContact)?;
-
-        switchboard.invite(email).await
+        switchboard.login(&user_email).await?;
+        switchboard.invite(email).await?;
+        Ok(switchboard)
     }
 
     pub fn set_display_picture(&mut self, display_picture: Vec<u8>) -> Result<(), Box<dyn Error>> {
-        let user_email = self.user_email.clone().ok_or(MsnpError::InvalidArgument)?;
+        let user_email = self.user_email.clone().ok_or(MsnpError::NotLoggedIn)?;
 
         let mut hash = sha1_smol::Sha1::new();
         hash.update(display_picture.as_slice());
@@ -744,58 +525,13 @@ impl Client {
             display_picture.len()
         ));
 
-        self.display_picture = Some(display_picture.clone());
+        self.display_picture = Some(display_picture);
         Ok(())
     }
 
-    pub async fn request_contact_display_picture(
-        &self,
-        email: &String,
-        msn_object: &String,
-        session_id: &String,
-    ) -> Result<(), Box<dyn Error>> {
-        let switchboards = self
-            .switchboards
-            .lock()
-            .or(Err(MsnpError::CouldNotGetDisplayPicture))?;
-
-        let switchboard = switchboards
-            .get(session_id)
-            .ok_or(MsnpError::CouldNotGetDisplayPicture)?;
-
-        switchboard
-            .request_contact_display_picture(email, msn_object)
-            .await
-    }
-
-    pub async fn leave_session(&self, session_id: &String) -> Result<(), Box<dyn Error>> {
-        let switchboards = self
-            .switchboards
-            .lock()
-            .or(Err(MsnpError::InvalidArgument))?;
-
-        let switchboard = switchboards
-            .get(session_id)
-            .ok_or(MsnpError::InvalidArgument)?;
-
-        switchboard.disconnect().await?;
-        Ok(())
-    }
-
-    pub async fn disconnect(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn disconnect(&self) -> Result<(), SendError<Vec<u8>>> {
         let command = "OUT\r\n";
         trace!("C: {command}");
-        self.ns_tx.send(command.as_bytes().to_vec()).await?;
-
-        let switchboards = self
-            .switchboards
-            .lock()
-            .or(Err(MsnpError::CouldNotGetDisplayPicture))?;
-
-        for switchboard in switchboards.values() {
-            switchboard.disconnect().await?;
-        }
-
-        Ok(())
+        self.ns_tx.send(command.as_bytes().to_vec()).await
     }
 }

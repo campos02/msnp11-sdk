@@ -70,6 +70,14 @@ impl MockSB {
                                 &["USR 1 OK testing@example.com Testing\r\n"]
                             }
 
+                            "ANS 1 testing@example.com 123456 11752013\r\n" => &[
+                                "IRO 1 1 1 bob@passport.com Bob\r\n",
+                                "ANS 1 OK\r\n",
+                                "MSG bob@passport.com Bob 134\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nX-MMS-IM-Format: FN=Microsoft%20Sans%20Serif; EF=; CO=ff; CS=0; PF=22\r\n\r\nh",
+                                "MSG bob@passport.com Bob 69\r\nMIME-Version: 1.0\r\nContent-Type: text/x-msnmsgr-datacast\r\n\r\nID: 1\r\n\r\n",
+                                "BYE bob@passport.com\r\n",
+                            ],
+
                             "CAL 2 bob@passport.com\r\n" => {
                                 &["CAL 2 RINGING 11752013\r\n", "JOI bob@passport.com\r\n"]
                             }

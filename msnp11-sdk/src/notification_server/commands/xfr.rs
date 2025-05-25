@@ -1,5 +1,4 @@
 use crate::connection_error::ConnectionError;
-use crate::event::Event;
 use crate::internal_event::InternalEvent;
 use crate::switchboard::switchboard::Switchboard;
 use log::trace;
@@ -12,7 +11,6 @@ impl Xfr {
     pub async fn send(
         tr_id: &mut usize,
         ns_tx: &mpsc::Sender<Vec<u8>>,
-        event_tx: &mpsc::Sender<Event>,
         internal_tx: &broadcast::Sender<InternalEvent>,
         display_picture: &Option<Vec<u8>>,
         msn_object: &Option<String>,
@@ -39,8 +37,6 @@ impl Xfr {
                             server_and_port[0],
                             server_and_port[1],
                             args[5],
-                            event_tx.clone(),
-                            internal_tx.clone(),
                             display_picture.clone(),
                             msn_object.clone(),
                             user_email.clone(),

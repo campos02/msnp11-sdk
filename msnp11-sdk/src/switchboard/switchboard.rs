@@ -1,8 +1,8 @@
 use crate::client::Client;
+use crate::connection_error::ConnectionError;
 use crate::event::Event;
 use crate::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
-use crate::msnp_error::MsnpError;
 use crate::switchboard::commands::ans::Ans;
 use crate::switchboard::commands::cal::Cal;
 use crate::switchboard::commands::msg::Msg;
@@ -14,7 +14,6 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::DekuContainerRead;
 use log::trace;
-use std::collections::HashSet;
 use std::error::Error;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -23,31 +22,33 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{broadcast, mpsc};
 
+#[derive(Debug)]
 pub struct Switchboard {
     event_tx: mpsc::Sender<Event>,
+    event_rx: mpsc::Receiver<Event>,
     sb_tx: mpsc::Sender<Vec<u8>>,
     internal_tx: broadcast::Sender<InternalEvent>,
     tr_id: Arc<tokio::sync::Mutex<usize>>,
     session_id: Option<String>,
     cki_string: String,
-    participants: Arc<std::sync::Mutex<HashSet<String>>>,
     display_picture: Option<Vec<u8>>,
     msn_object: Option<String>,
     user_email: String,
 }
 
 impl Switchboard {
-    pub async fn new(
+    pub(crate) async fn new(
         server: &str,
         port: &str,
         cki_string: &str,
-        event_tx: mpsc::Sender<Event>,
-        internal_tx: broadcast::Sender<InternalEvent>,
         display_picture: Option<Vec<u8>>,
         msn_object: Option<String>,
         user_email: String,
     ) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        let (event_tx, event_rx) = mpsc::channel::<Event>(64);
         let (sb_tx, mut sb_rx) = mpsc::channel::<Vec<u8>>(16);
+        let (internal_tx, _) = broadcast::channel::<InternalEvent>(64);
+
         let socket = TcpStream::connect(format!("{server}:{port}")).await?;
         let (mut rd, mut wr) = socket.into_split();
 
@@ -73,23 +74,24 @@ impl Switchboard {
 
         Ok(Self {
             event_tx,
+            event_rx,
             sb_tx,
             internal_tx,
             tr_id: Arc::new(tokio::sync::Mutex::new(0)),
             session_id: None,
             cki_string: cki_string.to_string(),
-            participants: Arc::new(std::sync::Mutex::new(HashSet::new())),
             display_picture,
             msn_object,
             user_email,
         })
     }
 
-    async fn listen_to_internal_events(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
+    async fn listen_to_internal_events(
+        &self,
+        mut internal_rx: broadcast::Receiver<InternalEvent>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let internal_tx = self.internal_tx.clone();
         let sb_tx = self.sb_tx.clone();
-        let mut internal_rx = self.internal_tx.subscribe();
-        let session_id = self.session_id.clone().ok_or(MsnpError::NotLoggedIn)?;
         let event_tx = self.event_tx.clone();
         let display_picture = self.display_picture.clone();
         let msn_object = self.msn_object.clone();
@@ -100,7 +102,7 @@ impl Switchboard {
             while let Ok(event) = internal_rx.recv().await {
                 match event {
                     InternalEvent::ServerReply(reply) => {
-                        let event = into_event(&reply, &session_id);
+                        let event = into_event(&reply);
                         event_tx
                             .send(event)
                             .await
@@ -277,9 +279,22 @@ impl Switchboard {
         Ok(())
     }
 
-    pub async fn login(&self, email: &String) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut tr_id = self.tr_id.lock().await;
+    pub async fn receive_event(&mut self) -> Result<Event, ConnectionError> {
+        self.event_rx
+            .recv()
+            .await
+            .ok_or(ConnectionError::Disconnected)
+    }
 
+    pub fn event_queue_size(&self) -> usize {
+        self.event_rx.len()
+    }
+
+    pub(crate) async fn login(&self, email: &String) -> Result<(), Box<dyn Error + Send + Sync>> {
+        // Subscribe first so no events are missed
+        let internal_rx = self.internal_tx.subscribe();
+
+        let mut tr_id = self.tr_id.lock().await;
         Usr::send(
             &mut tr_id,
             &self.sb_tx,
@@ -289,21 +304,19 @@ impl Switchboard {
         )
         .await?;
 
-        self.participants
-            .lock()
-            .or(Err(MsnpError::CouldNotGetParticipants))?
-            .insert(email.to_owned());
-
+        self.listen_to_internal_events(internal_rx).await?;
         Ok(())
     }
 
-    pub async fn answer(
+    pub(crate) async fn answer(
         &mut self,
         email: String,
         session_id: &String,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut tr_id = self.tr_id.lock().await;
+        // Subscribe first so no events are missed
+        let internal_rx = self.internal_tx.subscribe();
 
+        let mut tr_id = self.tr_id.lock().await;
         Ans::send(
             &mut tr_id,
             &self.sb_tx,
@@ -314,44 +327,19 @@ impl Switchboard {
         )
         .await?;
 
+        self.listen_to_internal_events(internal_rx).await?;
         self.session_id = Some(session_id.to_owned());
-        self.listen_to_internal_events().await?;
-
-        self.participants
-            .lock()
-            .or(Err(MsnpError::CouldNotGetParticipants))?
-            .insert(email.to_owned());
-
         Ok(())
     }
 
     pub async fn invite(&mut self, email: &String) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut tr_id = self.tr_id.lock().await;
-        let had_session_id = self.session_id.is_some();
-
         self.session_id = Some(Cal::send(&mut tr_id, &self.sb_tx, &self.internal_tx, email).await?);
-        self.participants
-            .lock()
-            .or(Err(MsnpError::CouldNotGetParticipants))?
-            .insert(email.to_owned());
-
-        if !had_session_id {
-            self.listen_to_internal_events().await?;
-        }
-
         Ok(())
     }
 
     pub fn get_session_id(&self) -> Option<String> {
         self.session_id.clone()
-    }
-
-    pub fn get_participants(&self) -> Result<HashSet<String>, Box<dyn Error + Send + Sync>> {
-        Ok(self
-            .participants
-            .lock()
-            .or(Err(MsnpError::CouldNotGetParticipants))?
-            .clone())
     }
 
     pub async fn send_text_message(

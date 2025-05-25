@@ -7,4 +7,4 @@ pub mod models;
 pub mod msnp_error;
 mod notification_server;
 mod passport_auth;
-mod switchboard;
+pub mod switchboard;

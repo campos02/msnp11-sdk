@@ -1,4 +1,3 @@
-
 #[tokio::test]
 async fn add_contact() {
     let mut client = msnp11_sdk::client::Client::new("127.0.0.1".to_string(), "1863".to_string())
@@ -30,7 +29,7 @@ async fn add_contact() {
         _ => msnp11_sdk::event::Event::Disconnected,
     };
 
-    assert_eq!(result, msnp11_sdk::event::Event::Authenticated);
+    assert!(matches!(result, msnp11_sdk::event::Event::Authenticated));
 
     if let msnp11_sdk::event::Event::ContactInForwardList {
         email,
@@ -72,7 +71,7 @@ async fn add_contact() {
         assert_eq!(lists, vec![msnp11_sdk::list::List::AllowList]);
     }
 
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    assert!(client.event_queue_size() >= 1);
     for _ in 0..client.event_queue_size() {
         match client.receive_event().await.unwrap() {
             msnp11_sdk::event::Event::AddedBy {

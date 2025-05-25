@@ -7,7 +7,7 @@ use core::str;
 use deku::DekuContainerRead;
 use std::io::Cursor;
 
-pub fn into_event(message: &String, session_id: &String) -> Event {
+pub fn into_event(message: &String) -> Event {
     let command = message
         .lines()
         .next()
@@ -25,7 +25,6 @@ pub fn into_event(message: &String, session_id: &String) -> Event {
 
             if content_type.contains("text/plain") {
                 return Event::TextMessage {
-                    session_id: session_id.to_owned(),
                     email: args[1].to_string(),
                     message: PlainText::new(payload),
                 };
@@ -35,7 +34,6 @@ pub fn into_event(message: &String, session_id: &String) -> Event {
                 let text = payload.split("\r\n\r\n").nth(1).unwrap_or("");
                 if text == "ID: 1" {
                     return Event::Nudge {
-                        session_id: session_id.to_owned(),
                         email: args[1].to_string(),
                     };
                 }
@@ -47,7 +45,6 @@ pub fn into_event(message: &String, session_id: &String) -> Event {
                 };
 
                 return Event::TypingNotification {
-                    session_id: session_id.to_owned(),
                     email: typing_user.replace("TypingUser: ", ""),
                 };
             }
@@ -56,17 +53,14 @@ pub fn into_event(message: &String, session_id: &String) -> Event {
         }
 
         "JOI" => Event::ParticipantInSwitchboard {
-            session_id: session_id.to_owned(),
             email: args[1].to_string(),
         },
 
         "IRO" => Event::ParticipantInSwitchboard {
-            session_id: session_id.to_owned(),
             email: args[4].to_string(),
         },
 
         "BYE" => Event::ParticipantLeftSwitchboard {
-            session_id: session_id.to_owned(),
             email: args[1].to_string(),
         },
 

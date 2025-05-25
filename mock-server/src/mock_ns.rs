@@ -116,6 +116,11 @@ impl MockNS {
 
                             "XFR 7 SB\r\n" => &["XFR 7 SB 127.0.0.1:1864 CKI 123456\r\n"],
 
+                            "GTC 7 ReceiveRNG\r\n" => &[
+                                "GTC 7 ReceiveRNG\r\n",
+                                "RNG 11752013 127.0.0.1:1864 CKI 123456 bob@passport.com Bob\r\n",
+                            ],
+
                             _ => &[],
                         };
 
