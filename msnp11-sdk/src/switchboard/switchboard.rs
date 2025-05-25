@@ -330,7 +330,6 @@ impl Switchboard {
         let had_session_id = self.session_id.is_some();
 
         self.session_id = Some(Cal::send(&mut tr_id, &self.sb_tx, &self.internal_tx, email).await?);
-
         self.participants
             .lock()
             .or(Err(MsnpError::CouldNotGetParticipants))?
@@ -363,7 +362,7 @@ impl Switchboard {
         Msg::send_text_message(&mut tr_id, &self.sb_tx, &self.internal_tx, message).await
     }
 
-    pub async fn send_nudge(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
+    pub async fn send_nudge(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut tr_id = self.tr_id.lock().await;
         Msg::send_nudge(&mut tr_id, &self.sb_tx, &self.internal_tx).await
     }

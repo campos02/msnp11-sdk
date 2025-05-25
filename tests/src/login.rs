@@ -1,18 +1,11 @@
-use env_logger::Env;
-use msnp11_sdk::client::Client;
-use msnp11_sdk::event::Event;
-use msnp11_sdk::list::List;
-use msnp11_sdk::models::personal_message::PersonalMessage;
-use msnp11_sdk::models::presence::Presence;
 
 #[tokio::test]
 async fn login() {
-    env_logger::Builder::from_env(Env::default().default_filter_or("trace")).init();
-    let mut client = Client::new("127.0.0.1".to_string(), "1863".to_string())
+    let mut client = msnp11_sdk::client::Client::new("127.0.0.1".to_string(), "1863".to_string())
         .await
         .unwrap();
 
-    let result: Event = match client
+    let result: msnp11_sdk::event::Event = match client
         .login(
             "testing@example.com".to_string(),
             "123456".to_string(),
@@ -20,8 +13,8 @@ async fn login() {
         )
         .await
     {
-        Ok(Event::RedirectedTo { server, port }) => {
-            client = Client::new(server, port).await.unwrap();
+        Ok(msnp11_sdk::event::Event::RedirectedTo { server, port }) => {
+            client = msnp11_sdk::client::Client::new(server, port).await.unwrap();
             client
                 .login(
                     "testing@example.com".to_string(),
@@ -32,38 +25,39 @@ async fn login() {
                 .unwrap()
         }
 
-        Ok(Event::Authenticated) => Event::Authenticated,
+        Ok(msnp11_sdk::event::Event::Authenticated) => msnp11_sdk::event::Event::Authenticated,
         Err(err) => panic!("Login error: {err}"),
-        _ => Event::Disconnected,
+        _ => msnp11_sdk::event::Event::Disconnected,
     };
 
-    assert_eq!(result, Event::Authenticated);
+    assert_eq!(result, msnp11_sdk::event::Event::Authenticated);
 
     client
-        .set_presence(&Presence::new("NLN".to_string(), None))
+        .set_presence(&msnp11_sdk::models::presence::Presence::new("NLN".to_string(), None))
         .await
         .unwrap();
 
     client
-        .set_personal_message(&PersonalMessage {
+        .set_personal_message(&msnp11_sdk::models::personal_message::PersonalMessage {
             psm: "test".to_string(),
             current_media: "".to_string(),
         })
         .await
         .unwrap();
 
-    for _ in 1..client.event_queue_size() {
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    for _ in 0..client.event_queue_size() {
         match client.receive_event().await.unwrap() {
-            Event::Gtc(gtc) => assert_eq!(gtc, "A"),
-            Event::Blp(blp) => assert_eq!(blp, "AL"),
-            Event::DisplayName(display_name) => assert_eq!(display_name, "Testing"),
+            msnp11_sdk::event::Event::Gtc(gtc) => assert_eq!(gtc, "A"),
+            msnp11_sdk::event::Event::Blp(blp) => assert_eq!(blp, "AL"),
+            msnp11_sdk::event::Event::DisplayName(display_name) => assert_eq!(display_name, "Testing"),
 
-            Event::Group { name, guid: id } => {
+            msnp11_sdk::event::Event::Group { name, guid: id } => {
                 assert_eq!(name, "Mock Contacts");
                 assert_eq!(id, "124153dc-a695-4f6c-93e8-8e07c9775251");
             }
 
-            Event::ContactInForwardList {
+            msnp11_sdk::event::Event::ContactInForwardList {
                 email,
                 display_name,
                 guid,
@@ -76,21 +70,21 @@ async fn login() {
                 assert_eq!(groups, vec!["124153dc-a695-4f6c-93e8-8e07c9775251"]);
                 assert_eq!(
                     lists,
-                    vec![List::ForwardList, List::BlockList, List::ReverseList]
+                    vec![msnp11_sdk::list::List::ForwardList, msnp11_sdk::list::List::BlockList, msnp11_sdk::list::List::ReverseList]
                 )
             }
 
-            Event::Contact {
+            msnp11_sdk::event::Event::Contact {
                 email,
                 display_name,
                 lists,
             } => {
                 assert_eq!(email, "fred@passport.com");
                 assert_eq!(display_name, "Fred");
-                assert_eq!(lists, vec![List::AllowList])
+                assert_eq!(lists, vec![msnp11_sdk::list::List::AllowList])
             }
 
-            Event::PresenceUpdate {
+            msnp11_sdk::event::Event::PresenceUpdate {
                 email,
                 display_name,
                 presence,
@@ -99,7 +93,7 @@ async fn login() {
                 assert_eq!(display_name, "Bob");
                 assert_eq!(
                     presence,
-                    Presence {
+                    msnp11_sdk::models::presence::Presence {
                         presence: "NLN".to_string(),
                         client_id: 1073741824,
                         msn_object: Some("<msnobj Creator=\"".to_string())
@@ -107,14 +101,14 @@ async fn login() {
                 );
             }
 
-            Event::PersonalMessageUpdate {
+            msnp11_sdk::event::Event::PersonalMessageUpdate {
                 email,
                 personal_message,
             } => {
                 assert_eq!(email, "bob@passport.com");
                 assert_eq!(
                     personal_message,
-                    PersonalMessage {
+                    msnp11_sdk::models::personal_message::PersonalMessage {
                         psm: "my msn all ducked".to_string(),
                         current_media: "".to_string()
                     }
@@ -124,4 +118,6 @@ async fn login() {
             _ => (),
         }
     }
+
+    client.disconnect().await.unwrap();
 }

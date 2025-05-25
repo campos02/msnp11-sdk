@@ -19,10 +19,10 @@ impl Adc {
         list: List,
     ) -> Result<Event, Box<dyn Error>> {
         let mut internal_rx = internal_tx.subscribe();
-        let encoded_display_name = urlencoding::encode(display_name).to_string();
 
         if list == List::ForwardList {
             *tr_id += 1;
+            let encoded_display_name = urlencoding::encode(display_name).to_string();
             let command = format!("ADC {tr_id} FL N={email} F={encoded_display_name}\r\n");
 
             ns_tx.send(command.as_bytes().to_vec()).await?;

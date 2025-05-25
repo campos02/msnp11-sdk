@@ -22,10 +22,14 @@ impl PlainText {
         let italic = im_format[1].contains("I");
         let underline = im_format[1].contains("U");
         let strikethrough = im_format[1].contains("S");
-        let mut color = im_format[2].replace("CO=", "");
+        let mut color = im_format[2].replace("CO=", "").trim().to_string();
+
+        while color.len() < 6 {
+            color.insert_str(0, "0");
+        }
 
         // MSN uses BGR... just why
-        let color: u32 = if color.len() >= 6 {
+        let color: u32 = if color.len() <= 6 {
             let color = color.drain(..6);
             let color = color.as_str();
             let color = u32::from_str_radix(color, 16).unwrap_or(0);
@@ -76,9 +80,13 @@ impl PlainText {
             message.push_str("S");
         }
 
+        let mut color = self.color.trim().replace("#", "");
+        while color.len() < 6 {
+            color.insert_str(0, "0");
+        }
+
         // MSN uses BGR... just why
-        let color: u32 = if self.color.len() >= 6 {
-            let mut color = self.color.trim().replace("#", "");
+        let color: u32 = if self.color.len() <= 6 {
             let color = color.drain(..6);
             let color = color.as_str();
             let color = u32::from_str_radix(color, 16).unwrap_or(0);

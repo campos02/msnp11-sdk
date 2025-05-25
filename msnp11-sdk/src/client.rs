@@ -37,7 +37,6 @@ use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::net::{TcpStream, lookup_host};
-use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{broadcast, mpsc};
 
 pub struct Client {
@@ -388,6 +387,48 @@ impl Client {
         Rem::send_with_forward_list(&mut self.tr_id, &self.ns_tx, &self.internal_tx, guid).await
     }
 
+    pub async fn block_contact(&mut self, email: &String) -> Result<(), Box<dyn Error>> {
+        Adc::send(
+            &mut self.tr_id,
+            &self.ns_tx,
+            &self.internal_tx,
+            email,
+            &"".to_string(),
+            List::BlockList,
+        )
+        .await?;
+
+        Rem::send(
+            &mut self.tr_id,
+            &self.ns_tx,
+            &self.internal_tx,
+            email,
+            List::AllowList,
+        )
+        .await
+    }
+
+    pub async fn unblock_contact(&mut self, email: &String) -> Result<(), Box<dyn Error>> {
+        Adc::send(
+            &mut self.tr_id,
+            &self.ns_tx,
+            &self.internal_tx,
+            email,
+            &"".to_string(),
+            List::AllowList,
+        )
+        .await?;
+
+        Rem::send(
+            &mut self.tr_id,
+            &self.ns_tx,
+            &self.internal_tx,
+            email,
+            List::BlockList,
+        )
+        .await
+    }
+
     pub async fn create_group(&mut self, name: &String) -> Result<(), Box<dyn Error>> {
         Adg::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, name).await
     }
@@ -617,13 +658,13 @@ impl Client {
         message: &PlainText,
         session_id: &String,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut switchboards = self
+        let switchboards = self
             .switchboards
             .lock()
             .or(Err(MsnpError::MessageNotDelivered))?;
 
         let switchboard = switchboards
-            .get_mut(session_id)
+            .get(session_id)
             .ok_or(MsnpError::MessageNotDelivered)?;
 
         switchboard.send_text_message(message).await
@@ -633,13 +674,13 @@ impl Client {
         &self,
         session_id: &String,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut switchboards = self
+        let switchboards = self
             .switchboards
             .lock()
             .or(Err(MsnpError::MessageNotDelivered))?;
 
         let switchboard = switchboards
-            .get_mut(session_id)
+            .get(session_id)
             .ok_or(MsnpError::MessageNotDelivered)?;
 
         switchboard.send_nudge().await
@@ -653,13 +694,13 @@ impl Client {
             return Err(MsnpError::NotLoggedIn.into());
         };
 
-        let mut switchboards = self
+        let switchboards = self
             .switchboards
             .lock()
             .or(Err(MsnpError::MessageNotDelivered))?;
 
         let switchboard = switchboards
-            .get_mut(session_id)
+            .get(session_id)
             .ok_or(MsnpError::MessageNotDelivered)?;
 
         switchboard.send_typing_user(user_email).await
@@ -713,13 +754,13 @@ impl Client {
         msn_object: &String,
         session_id: &String,
     ) -> Result<(), Box<dyn Error>> {
-        let mut switchboards = self
+        let switchboards = self
             .switchboards
             .lock()
             .or(Err(MsnpError::CouldNotGetDisplayPicture))?;
 
         let switchboard = switchboards
-            .get_mut(session_id)
+            .get(session_id)
             .ok_or(MsnpError::CouldNotGetDisplayPicture)?;
 
         switchboard
@@ -727,9 +768,34 @@ impl Client {
             .await
     }
 
-    pub async fn disconnect(&self) -> Result<(), SendError<Vec<u8>>> {
+    pub async fn leave_session(&self, session_id: &String) -> Result<(), Box<dyn Error>> {
+        let switchboards = self
+            .switchboards
+            .lock()
+            .or(Err(MsnpError::InvalidArgument))?;
+
+        let switchboard = switchboards
+            .get(session_id)
+            .ok_or(MsnpError::InvalidArgument)?;
+
+        switchboard.disconnect().await?;
+        Ok(())
+    }
+
+    pub async fn disconnect(&self) -> Result<(), Box<dyn Error>> {
         let command = "OUT\r\n";
         trace!("C: {command}");
-        self.ns_tx.send(command.as_bytes().to_vec()).await
+        self.ns_tx.send(command.as_bytes().to_vec()).await?;
+
+        let switchboards = self
+            .switchboards
+            .lock()
+            .or(Err(MsnpError::CouldNotGetDisplayPicture))?;
+
+        for switchboard in switchboards.values() {
+            switchboard.disconnect().await?;
+        }
+
+        Ok(())
     }
 }
