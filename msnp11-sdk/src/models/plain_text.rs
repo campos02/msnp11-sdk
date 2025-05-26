@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
 pub struct PlainText {
     pub bold: bool,
     pub italic: bool,

@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, uniffi::Enum)]
 pub enum List {
     ForwardList,
     AllowList,

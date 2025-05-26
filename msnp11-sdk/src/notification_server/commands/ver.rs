@@ -1,27 +1,31 @@
-use crate::connection_error::ConnectionError;
 use crate::internal_event::InternalEvent;
-use crate::msnp_error::MsnpError;
+use crate::sdk_error::SdkError;
 use log::trace;
-use std::error::Error;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::{broadcast, mpsc};
 
 pub struct Ver;
 
 impl Ver {
     pub async fn send(
-        tr_id: &mut usize,
+        tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
-        internal_tx: &broadcast::Sender<InternalEvent>,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut internal_rx = internal_tx.subscribe();
+        internal_rx: &mut broadcast::Receiver<InternalEvent>,
+    ) -> Result<(), SdkError> {
+        tr_id.fetch_add(1, Ordering::SeqCst);
+        let tr_id = tr_id.load(Ordering::SeqCst);
 
-        *tr_id += 1;
         let command = format!("VER {tr_id} MSNP11 CVR0\r\n");
-        ns_tx.send(command.as_bytes().to_vec()).await?;
+        ns_tx
+            .send(command.as_bytes().to_vec())
+            .await
+            .or(Err(SdkError::TransmittingError))?;
 
         trace!("C: {command}");
 
-        while let InternalEvent::ServerReply(reply) = internal_rx.recv().await? {
+        while let InternalEvent::ServerReply(reply) =
+            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        {
             trace!("S: {reply}");
 
             let args: Vec<&str> = reply.trim().split(' ').collect();
@@ -29,7 +33,7 @@ impl Ver {
                 "VER" => {
                     if args[1] == tr_id.to_string() {
                         return if args[2] != "MSNP11" {
-                            Err(MsnpError::ProtocolNotSupported.into())
+                            Err(SdkError::ProtocolNotSupported.into())
                         } else {
                             Ok(())
                         };
@@ -40,6 +44,6 @@ impl Ver {
             }
         }
 
-        Err(ConnectionError::Disconnected.into())
+        Err(SdkError::Disconnected.into())
     }
 }

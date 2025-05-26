@@ -3,8 +3,9 @@ use crate::models::personal_message::PersonalMessage;
 use crate::models::plain_text::PlainText;
 use crate::models::presence::Presence;
 use crate::switchboard::switchboard::Switchboard;
+use std::sync::Arc;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, uniffi::Enum)]
 pub enum Event {
     ServerReply,
 
@@ -40,7 +41,7 @@ pub enum Event {
     PresenceUpdate {
         email: String,
         display_name: String,
-        presence: Presence,
+        presence: Arc<Presence>,
     },
 
     PersonalMessageUpdate {
@@ -58,7 +59,7 @@ pub enum Event {
     },
 
     RemovedBy(String),
-    SessionAnswered(Switchboard),
+    SessionAnswered(Arc<Switchboard>),
 
     TextMessage {
         email: String,

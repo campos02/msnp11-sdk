@@ -1,31 +1,33 @@
-use crate::connection_error::ConnectionError;
 use crate::event::Event;
 use crate::internal_event::InternalEvent;
 use crate::list::List;
-use crate::msnp_error::MsnpError;
+use crate::sdk_error::SdkError;
 use log::trace;
-use std::error::Error;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::{broadcast, mpsc};
 
 pub struct Adc;
 
 impl Adc {
     pub async fn send(
-        tr_id: &mut usize,
+        tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
-        internal_tx: &broadcast::Sender<InternalEvent>,
+        internal_rx: &mut broadcast::Receiver<InternalEvent>,
         email: &String,
         display_name: &String,
         list: List,
-    ) -> Result<Event, Box<dyn Error>> {
-        let mut internal_rx = internal_tx.subscribe();
+    ) -> Result<Event, SdkError> {
+        tr_id.fetch_add(1, Ordering::SeqCst);
+        let tr_id = tr_id.load(Ordering::SeqCst);
 
         if list == List::ForwardList {
-            *tr_id += 1;
-            let encoded_display_name = urlencoding::encode(display_name).to_string();
+            let encoded_display_name = urlencoding::encode(display_name);
             let command = format!("ADC {tr_id} FL N={email} F={encoded_display_name}\r\n");
+            ns_tx
+                .send(command.as_bytes().to_vec())
+                .await
+                .or(Err(SdkError::TransmittingError))?;
 
-            ns_tx.send(command.as_bytes().to_vec()).await?;
             trace!("C: {command}");
         } else {
             let list = match list {
@@ -36,14 +38,18 @@ impl Adc {
                 List::PendingList => "PL",
             };
 
-            *tr_id += 1;
             let command = format!("ADC {tr_id} {list} N={email}\r\n");
+            ns_tx
+                .send(command.as_bytes().to_vec())
+                .await
+                .or(Err(SdkError::TransmittingError))?;
 
-            ns_tx.send(command.as_bytes().to_vec()).await?;
             trace!("C: {command}");
         }
 
-        while let InternalEvent::ServerReply(reply) = internal_rx.recv().await? {
+        while let InternalEvent::ServerReply(reply) =
+            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        {
             trace!("S: {reply}");
 
             let args: Vec<&str> = reply.trim().split(' ').collect();
@@ -88,25 +94,25 @@ impl Adc {
 
                 "201" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::InvalidArgument.into());
+                        return Err(SdkError::InvalidArgument.into());
                     }
                 }
 
                 "208" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::InvalidContact.into());
+                        return Err(SdkError::InvalidContact.into());
                     }
                 }
 
                 "215" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::InvalidArgument.into());
+                        return Err(SdkError::InvalidArgument.into());
                     }
                 }
 
                 "603" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::ServerError.into());
+                        return Err(SdkError::ServerError.into());
                     }
                 }
 
@@ -114,25 +120,30 @@ impl Adc {
             }
         }
 
-        Err(ConnectionError::Disconnected.into())
+        Err(SdkError::Disconnected.into())
     }
 
     pub async fn send_with_group(
-        tr_id: &mut usize,
+        tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
-        internal_tx: &broadcast::Sender<InternalEvent>,
+        internal_rx: &mut broadcast::Receiver<InternalEvent>,
         guid: &String,
         group_guid: &String,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut internal_rx = internal_tx.subscribe();
+    ) -> Result<(), SdkError> {
+        tr_id.fetch_add(1, Ordering::SeqCst);
+        let tr_id = tr_id.load(Ordering::SeqCst);
 
-        *tr_id += 1;
         let command = format!("ADC {tr_id} FL C={guid} {group_guid}\r\n");
+        ns_tx
+            .send(command.as_bytes().to_vec())
+            .await
+            .or(Err(SdkError::TransmittingError))?;
 
-        ns_tx.send(command.as_bytes().to_vec()).await?;
         trace!("C: {command}");
 
-        while let InternalEvent::ServerReply(reply) = internal_rx.recv().await? {
+        while let InternalEvent::ServerReply(reply) =
+            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        {
             trace!("S: {reply}");
 
             let args: Vec<&str> = reply.trim().split(' ').collect();
@@ -149,31 +160,31 @@ impl Adc {
 
                 "201" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::InvalidArgument.into());
+                        return Err(SdkError::InvalidArgument.into());
                     }
                 }
 
                 "208" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::InvalidContact.into());
+                        return Err(SdkError::InvalidContact.into());
                     }
                 }
 
                 "215" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::InvalidArgument.into());
+                        return Err(SdkError::InvalidArgument.into());
                     }
                 }
 
                 "224" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::InvalidArgument.into());
+                        return Err(SdkError::InvalidArgument.into());
                     }
                 }
 
                 "603" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::ServerError.into());
+                        return Err(SdkError::ServerError.into());
                     }
                 }
 
@@ -181,6 +192,6 @@ impl Adc {
             }
         }
 
-        Err(ConnectionError::Disconnected.into())
+        Err(SdkError::Disconnected.into())
     }
 }

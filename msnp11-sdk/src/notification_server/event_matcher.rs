@@ -5,9 +5,15 @@ use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
+use std::sync::Arc;
 
-pub fn into_event(message: &String) -> Event {
-    let command = message
+pub fn into_event(base64_message: &String) -> Option<Event> {
+    let message_bytes = STANDARD
+        .decode(base64_message)
+        .expect("Could not decode socket message from base64");
+
+    let reply = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) }.to_string();
+    let command = reply
         .lines()
         .next()
         .expect("Could not get command from server message")
@@ -18,29 +24,29 @@ pub fn into_event(message: &String) -> Event {
     match args[0] {
         "GTC" => {
             let gtc = if args.len() > 2 { args[2] } else { args[1] };
-            Event::Gtc(gtc.to_string())
+            Some(Event::Gtc(gtc.to_string()))
         }
 
         "BLP" => {
             let blp = if args.len() > 2 { args[2] } else { args[1] };
-            Event::Blp(blp.to_string())
+            Some(Event::Blp(blp.to_string()))
         }
 
         "PRP" => {
             let display_name = if args.len() > 2 { args[2] } else { args[1] };
-            Event::DisplayName(
+            Some(Event::DisplayName(
                 urlencoding::decode(display_name)
                     .expect("Could not url decode display name")
                     .to_string(),
-            )
+            ))
         }
 
-        "LSG" => Event::Group {
+        "LSG" => Some(Event::Group {
             name: urlencoding::decode(args[1])
                 .expect("Could not url decode group name")
                 .to_string(),
             guid: args[2].to_string(),
-        },
+        }),
 
         "LST" => {
             let mut lists: Vec<List> = Vec::new();
@@ -76,7 +82,7 @@ pub fn into_event(message: &String) -> Event {
                     groups = args[5].split(",").map(|id| id.to_string()).collect();
                 }
 
-                Event::ContactInForwardList {
+                Some(Event::ContactInForwardList {
                     email: args[1].replace("N=", ""),
                     display_name: urlencoding::decode(args[2].replace("F=", "").as_str())
                         .expect("Could not url decode contact name")
@@ -84,15 +90,15 @@ pub fn into_event(message: &String) -> Event {
                     guid: args[3].replace("C=", ""),
                     groups,
                     lists,
-                }
+                })
             } else {
-                Event::Contact {
+                Some(Event::Contact {
                     email: args[1].replace("N=", ""),
                     display_name: urlencoding::decode(args[2].replace("F=", "").as_str())
                         .expect("Could not url decode contact name")
                         .to_string(),
                     lists,
-                }
+                })
             }
         }
 
@@ -114,69 +120,69 @@ pub fn into_event(message: &String) -> Event {
                 None
             };
 
-            Event::PresenceUpdate {
+            Some(Event::PresenceUpdate {
                 email: args[base_index + 2].to_string(),
                 display_name: urlencoding::decode(args[base_index + 3])
                     .expect("Could not url decode contact name")
                     .to_string(),
-                presence: Presence {
+                presence: Arc::new(Presence {
                     presence: args[base_index + 1].to_string(),
                     client_id: args[base_index + 4].to_string().parse().unwrap_or(0),
                     msn_object,
-                },
-            }
+                }),
+            })
         }
 
         "UBX" => {
-            let payload = message.replace(command.as_str(), "");
+            let payload = reply.replace(command.as_str(), "");
             let personal_message =
                 quick_xml::de::from_str(payload.as_str()).unwrap_or(PersonalMessage {
                     psm: "".to_string(),
                     current_media: "".to_string(),
                 });
 
-            Event::PersonalMessageUpdate {
+            Some(Event::PersonalMessageUpdate {
                 email: args[1].to_string(),
                 personal_message,
-            }
+            })
         }
 
-        "FLN" => Event::ContactOffline {
+        "FLN" => Some(Event::ContactOffline {
             email: args[1].to_string(),
-        },
+        }),
 
         "ADC" => {
             if args[1] == "0" && args[2] == "RL" {
-                Event::AddedBy {
+                Some(Event::AddedBy {
                     email: args[3].replace("N=", ""),
                     display_name: urlencoding::decode(args[4].replace("F=", "").as_str())
                         .expect("Could not url decode contact display name")
                         .to_string(),
-                }
+                })
             } else {
-                Event::ServerReply
+                None
             }
         }
 
         "REM" => {
             if args[1] == "0" && args[2] == "RL" {
-                Event::RemovedBy(args[3].replace("N=", ""))
+                Some(Event::RemovedBy(args[3].replace("N=", "")))
             } else {
-                Event::ServerReply
+                None
             }
         }
 
         "OUT" => {
             if args.len() > 1 {
                 if args[1] == "OTH" {
-                    return Event::LoggedInAnotherDevice;
+                    return Some(Event::LoggedInAnotherDevice);
                 }
             }
 
-            Event::Disconnected
+            Some(Event::Disconnected)
         }
 
-        _ => Event::ServerReply,
+        _ => None,
     }
 }
 

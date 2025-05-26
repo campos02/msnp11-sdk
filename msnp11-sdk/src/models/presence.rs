@@ -1,11 +1,13 @@
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, uniffi::Object)]
 pub struct Presence {
     pub presence: String,
     pub client_id: u64,
     pub msn_object: Option<String>,
 }
 
+#[uniffi::export]
 impl Presence {
+    #[uniffi::constructor]
     pub fn new(presence: String, msn_object: Option<String>) -> Self {
         Self {
             presence,

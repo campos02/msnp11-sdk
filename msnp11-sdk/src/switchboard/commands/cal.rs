@@ -1,28 +1,32 @@
-use crate::connection_error::ConnectionError;
 use crate::internal_event::InternalEvent;
-use crate::msnp_error::MsnpError;
+use crate::sdk_error::SdkError;
 use log::trace;
-use std::error::Error;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::{broadcast, mpsc};
 
 pub struct Cal;
 
 impl Cal {
     pub async fn send(
-        tr_id: &mut usize,
+        tr_id: &AtomicU32,
         sb_tx: &mpsc::Sender<Vec<u8>>,
-        internal_tx: &broadcast::Sender<InternalEvent>,
+        internal_rx: &mut broadcast::Receiver<InternalEvent>,
         email: &String,
-    ) -> Result<String, Box<dyn Error + Send + Sync>> {
-        let mut internal_rx = internal_tx.subscribe();
+    ) -> Result<String, SdkError> {
+        tr_id.fetch_add(1, Ordering::SeqCst);
+        let tr_id = tr_id.load(Ordering::SeqCst);
 
-        *tr_id += 1;
         let command = format!("CAL {tr_id} {email}\r\n");
+        sb_tx
+            .send(command.as_bytes().to_vec())
+            .await
+            .or(Err(SdkError::TransmittingError))?;
 
-        sb_tx.send(command.as_bytes().to_vec()).await?;
         trace!("C: {command}");
 
-        while let InternalEvent::ServerReply(reply) = internal_rx.recv().await? {
+        while let InternalEvent::ServerReply(reply) =
+            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        {
             trace!("S: {reply}");
 
             let args: Vec<&str> = reply.trim().split(' ').collect();
@@ -35,25 +39,25 @@ impl Cal {
 
                 "208" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::InvalidContact.into());
+                        return Err(SdkError::InvalidContact);
                     }
                 }
 
                 "215" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::InvalidContact.into());
+                        return Err(SdkError::InvalidContact);
                     }
                 }
 
                 "216" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::ContactIsOffline.into());
+                        return Err(SdkError::ContactIsOffline);
                     }
                 }
 
                 "217" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::ContactIsOffline.into());
+                        return Err(SdkError::ContactIsOffline);
                     }
                 }
 
@@ -61,6 +65,6 @@ impl Cal {
             }
         }
 
-        Err(ConnectionError::Disconnected.into())
+        Err(SdkError::Disconnected)
     }
 }

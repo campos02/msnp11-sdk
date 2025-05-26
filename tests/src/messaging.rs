@@ -26,6 +26,7 @@ async fn create_session() {
 
         Ok(msnp11_sdk::event::Event::Authenticated) => msnp11_sdk::event::Event::Authenticated,
         Err(err) => panic!("Login error: {err}"),
+
         _ => msnp11_sdk::event::Event::Disconnected,
     };
 
@@ -40,7 +41,7 @@ async fn create_session() {
         text: "h".to_string(),
     };
 
-    let mut switchboard = client
+    let switchboard = client
         .create_session(&"bob@passport.com".to_string())
         .await
         .unwrap();
@@ -111,11 +112,11 @@ async fn join_session() {
 
     assert!(matches!(result, msnp11_sdk::event::Event::Authenticated));
 
-    // Abuse GTC to get an RNG from the mock server
+    // GTC abuse from the mock server
     client.set_gtc(&"ReceiveRNG".to_string()).await.unwrap();
     loop {
         match client.receive_event().await.unwrap() {
-            msnp11_sdk::event::Event::SessionAnswered(mut switchboard) => {
+            msnp11_sdk::event::Event::SessionAnswered(switchboard) => {
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 assert!(switchboard.event_queue_size() >= 4);
 

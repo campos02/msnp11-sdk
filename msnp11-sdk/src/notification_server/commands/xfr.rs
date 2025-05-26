@@ -1,30 +1,35 @@
-use crate::connection_error::ConnectionError;
 use crate::internal_event::InternalEvent;
+use crate::models::user_data::UserData;
+use crate::sdk_error::SdkError;
 use crate::switchboard::switchboard::Switchboard;
 use log::trace;
-use std::error::Error;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
 use tokio::sync::{broadcast, mpsc};
 
 pub struct Xfr;
 
 impl Xfr {
     pub async fn send(
-        tr_id: &mut usize,
+        tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
-        internal_tx: &broadcast::Sender<InternalEvent>,
-        display_picture: &Option<Vec<u8>>,
-        msn_object: &Option<String>,
-        user_email: &String,
-    ) -> Result<Switchboard, Box<dyn Error + Send + Sync>> {
-        let mut internal_rx = internal_tx.subscribe();
+        internal_rx: &mut broadcast::Receiver<InternalEvent>,
+        user_data: Arc<Mutex<UserData>>,
+    ) -> Result<Switchboard, SdkError> {
+        tr_id.fetch_add(1, Ordering::SeqCst);
+        let tr_id = tr_id.load(Ordering::SeqCst);
 
-        *tr_id += 1;
         let command = format!("XFR {tr_id} SB\r\n");
-        ns_tx.send(command.as_bytes().to_vec()).await?;
+        ns_tx
+            .send(command.as_bytes().to_vec())
+            .await
+            .or(Err(SdkError::TransmittingError))?;
 
         trace!("C: {command}");
 
-        while let InternalEvent::ServerReply(reply) = internal_rx.recv().await? {
+        while let InternalEvent::ServerReply(reply) =
+            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        {
             trace!("S: {reply}");
 
             let args: Vec<&str> = reply.trim().split(' ').collect();
@@ -37,9 +42,7 @@ impl Xfr {
                             server_and_port[0],
                             server_and_port[1],
                             args[5],
-                            display_picture.clone(),
-                            msn_object.clone(),
-                            user_email.clone(),
+                            user_data,
                         )
                         .await;
                     }
@@ -49,6 +52,6 @@ impl Xfr {
             }
         }
 
-        Err(ConnectionError::Disconnected.into())
+        Err(SdkError::Disconnected.into())
     }
 }

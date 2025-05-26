@@ -1,8 +1,9 @@
-use crate::client::Client;
-use crate::connection_error::ConnectionError;
 use crate::event::Event;
 use crate::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
+use crate::models::user_data::UserData;
+use crate::receive_split_into_base64::receive_split_into_base64;
+use crate::sdk_error::SdkError;
 use crate::switchboard::commands::ans::Ans;
 use crate::switchboard::commands::cal::Cal;
 use crate::switchboard::commands::msg::Msg;
@@ -16,24 +17,22 @@ use deku::DekuContainerRead;
 use log::trace;
 use std::error::Error;
 use std::io::Cursor;
-use std::sync::Arc;
+use std::sync::atomic::AtomicU32;
+use std::sync::{Arc, Mutex, RwLock};
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{broadcast, mpsc};
 
-#[derive(Debug)]
+#[derive(Debug, uniffi::Object)]
 pub struct Switchboard {
-    event_tx: mpsc::Sender<Event>,
-    event_rx: mpsc::Receiver<Event>,
+    event_tx: async_channel::Sender<Event>,
+    event_rx: async_channel::Receiver<Event>,
     sb_tx: mpsc::Sender<Vec<u8>>,
     internal_tx: broadcast::Sender<InternalEvent>,
-    tr_id: Arc<tokio::sync::Mutex<usize>>,
-    session_id: Option<String>,
+    tr_id: Arc<AtomicU32>,
+    session_id: Arc<RwLock<Option<String>>>,
     cki_string: String,
-    display_picture: Option<Vec<u8>>,
-    msn_object: Option<String>,
-    user_email: String,
+    user_data: Arc<Mutex<UserData>>,
 }
 
 impl Switchboard {
@@ -41,25 +40,35 @@ impl Switchboard {
         server: &str,
         port: &str,
         cki_string: &str,
-        display_picture: Option<Vec<u8>>,
-        msn_object: Option<String>,
-        user_email: String,
-    ) -> Result<Self, Box<dyn Error + Send + Sync>> {
-        let (event_tx, event_rx) = mpsc::channel::<Event>(64);
+        user_data: Arc<Mutex<UserData>>,
+    ) -> Result<Self, SdkError> {
+        let (event_tx, event_rx) = async_channel::bounded::<Event>(32);
         let (sb_tx, mut sb_rx) = mpsc::channel::<Vec<u8>>(16);
-        let (internal_tx, _) = broadcast::channel::<InternalEvent>(64);
+        let (internal_tx, _) = broadcast::channel::<InternalEvent>(32);
 
-        let socket = TcpStream::connect(format!("{server}:{port}")).await?;
+        let socket = TcpStream::connect(format!("{server}:{port}"))
+            .await
+            .or(Err(SdkError::CouldNotConnectToServer))?;
+
         let (mut rd, mut wr) = socket.into_split();
 
         let internal_task_tx = internal_tx.clone();
+        let event_task_tx = event_tx.clone();
         tokio::spawn(async move {
-            while let Ok(base64_messages) = Client::socket_messages_to_base64(&mut rd).await {
+            while let Ok(base64_messages) = receive_split_into_base64(&mut rd).await {
                 for base64_message in base64_messages {
                     let internal_event = into_internal_event(&base64_message);
                     internal_task_tx
                         .send(internal_event)
                         .expect("Error sending internal event to channel");
+
+                    let event = into_event(&base64_message);
+                    if let Some(event) = event {
+                        event_task_tx
+                            .send(event)
+                            .await
+                            .expect("Error sending event to channel");
+                    }
                 }
             }
         });
@@ -77,43 +86,49 @@ impl Switchboard {
             event_rx,
             sb_tx,
             internal_tx,
-            tr_id: Arc::new(tokio::sync::Mutex::new(0)),
-            session_id: None,
+            tr_id: Arc::new(AtomicU32::new(0)),
+            session_id: Arc::new(RwLock::new(None)),
             cki_string: cki_string.to_string(),
-            display_picture,
-            msn_object,
-            user_email,
+            user_data,
         })
     }
 
-    async fn listen_to_internal_events(
-        &self,
-        mut internal_rx: broadcast::Receiver<InternalEvent>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let internal_tx = self.internal_tx.clone();
+    async fn handle_p2p_events(&self) -> Result<(), SdkError> {
         let sb_tx = self.sb_tx.clone();
-        let event_tx = self.event_tx.clone();
-        let display_picture = self.display_picture.clone();
-        let msn_object = self.msn_object.clone();
-        let user_email = self.user_email.clone();
+        let mut internal_rx = self.internal_tx.subscribe();
         let tr_id = self.tr_id.clone();
+        let user_data_arc = self.user_data.clone();
+        let user_email;
+        {
+            let user_data = self
+                .user_data
+                .lock()
+                .or(Err(SdkError::CouldNotGetUserData))?;
+
+            user_email = user_data
+                .email
+                .as_ref()
+                .ok_or(SdkError::NotLoggedIn)?
+                .clone();
+        }
 
         tokio::spawn(async move {
             while let Ok(event) = internal_rx.recv().await {
                 match event {
-                    InternalEvent::ServerReply(reply) => {
-                        let event = into_event(&reply);
-                        event_tx
-                            .send(event)
-                            .await
-                            .expect("Error sending event to channel");
-                    }
-
                     InternalEvent::P2PInvite {
                         destination,
                         message: invite,
                     } => {
-                        if destination != user_email {
+                        let user_data;
+                        {
+                            let Ok(user_data_lock) = user_data_arc.lock() else {
+                                continue;
+                            };
+
+                            user_data = user_data_lock.clone();
+                        }
+
+                        if destination != *user_email {
                             continue;
                         }
 
@@ -143,7 +158,7 @@ impl Switchboard {
                         };
 
                         let context = context.replace("Context: ", "");
-                        let Some(msn_object) = msn_object.clone() else {
+                        let Some(msn_object) = user_data.msn_object.as_ref() else {
                             continue;
                         };
 
@@ -159,11 +174,10 @@ impl Switchboard {
                             continue;
                         };
 
-                        let mut tr_id = tr_id.lock().await;
                         if Msg::send_p2p(
-                            &mut tr_id,
+                            &tr_id,
                             &sb_tx,
-                            &internal_tx,
+                            &mut internal_rx,
                             ack_payload,
                             from.as_str(),
                         )
@@ -178,9 +192,9 @@ impl Switchboard {
                         };
 
                         if Msg::send_p2p(
-                            &mut tr_id,
+                            &tr_id,
                             &sb_tx,
-                            &internal_tx,
+                            &mut internal_rx,
                             ok_payload,
                             from.as_str(),
                         )
@@ -195,9 +209,9 @@ impl Switchboard {
                         };
 
                         if Msg::send_p2p(
-                            &mut tr_id,
+                            &tr_id,
                             &sb_tx,
-                            &internal_tx,
+                            &mut internal_rx,
                             preparation_payload,
                             from.as_str(),
                         )
@@ -207,7 +221,7 @@ impl Switchboard {
                             continue;
                         }
 
-                        let Some(display_picture) = display_picture.clone() else {
+                        let Some(display_picture) = user_data.display_picture.clone() else {
                             continue;
                         };
 
@@ -217,9 +231,9 @@ impl Switchboard {
 
                         for data_payload in data_payloads {
                             if Msg::send_p2p(
-                                &mut tr_id,
+                                &tr_id,
                                 &sb_tx,
-                                &internal_tx,
+                                &mut internal_rx,
                                 data_payload,
                                 from.as_str(),
                             )
@@ -235,7 +249,7 @@ impl Switchboard {
                         destination,
                         message: bye,
                     } => {
-                        if destination != user_email {
+                        if destination != *user_email {
                             continue;
                         }
 
@@ -256,11 +270,10 @@ impl Switchboard {
                             continue;
                         };
 
-                        let mut tr_id = tr_id.lock().await;
                         if Msg::send_p2p(
-                            &mut tr_id,
+                            &tr_id,
                             &sb_tx,
-                            &internal_tx,
+                            &mut internal_rx,
                             ack_payload,
                             from.as_str(),
                         )
@@ -279,101 +292,118 @@ impl Switchboard {
         Ok(())
     }
 
-    pub async fn receive_event(&mut self) -> Result<Event, ConnectionError> {
-        self.event_rx
-            .recv()
-            .await
-            .ok_or(ConnectionError::Disconnected)
-    }
-
-    pub fn event_queue_size(&self) -> usize {
-        self.event_rx.len()
-    }
-
-    pub(crate) async fn login(&self, email: &String) -> Result<(), Box<dyn Error + Send + Sync>> {
-        // Subscribe first so no events are missed
-        let internal_rx = self.internal_tx.subscribe();
-
-        let mut tr_id = self.tr_id.lock().await;
+    pub(crate) async fn login(&self, email: &String) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
         Usr::send(
-            &mut tr_id,
+            &self.tr_id,
             &self.sb_tx,
-            &self.internal_tx,
+            &mut internal_rx,
             email,
             &self.cki_string,
         )
         .await?;
 
-        self.listen_to_internal_events(internal_rx).await?;
-        Ok(())
+        self.handle_p2p_events().await
     }
 
     pub(crate) async fn answer(
-        &mut self,
-        email: String,
+        &self,
+        email: &String,
         session_id: &String,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        // Subscribe first so no events are missed
-        let internal_rx = self.internal_tx.subscribe();
-
-        let mut tr_id = self.tr_id.lock().await;
+        let mut internal_rx = self.internal_tx.subscribe();
         Ans::send(
-            &mut tr_id,
+            &self.tr_id,
             &self.sb_tx,
-            &self.internal_tx,
+            &mut internal_rx,
             &email,
             &self.cki_string,
             session_id,
         )
         .await?;
 
-        self.listen_to_internal_events(internal_rx).await?;
-        self.session_id = Some(session_id.to_owned());
+        self.handle_p2p_events().await?;
+
+        let mut session_id_lock = self
+            .session_id
+            .write()
+            .or(Err(SdkError::CouldNotSetSessionId))?;
+
+        *session_id_lock = Some(session_id.to_owned());
+        Ok(())
+    }
+}
+
+#[uniffi::export]
+impl Switchboard {
+    pub async fn receive_event(&self) -> Result<Event, SdkError> {
+        self.event_rx.recv().await.or(Err(SdkError::Disconnected))
+    }
+
+    pub fn event_queue_size(&self) -> u32 {
+        self.event_rx.len() as u32
+    }
+
+    pub async fn invite(&self, email: &String) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+
+        let session_id = Some(Cal::send(&self.tr_id, &self.sb_tx, &mut internal_rx, email).await?);
+        let mut session_id_lock = self
+            .session_id
+            .write()
+            .or(Err(SdkError::CouldNotSetSessionId))?;
+
+        *session_id_lock = session_id;
         Ok(())
     }
 
-    pub async fn invite(&mut self, email: &String) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut tr_id = self.tr_id.lock().await;
-        self.session_id = Some(Cal::send(&mut tr_id, &self.sb_tx, &self.internal_tx, email).await?);
-        Ok(())
+    pub fn get_session_id(&self) -> Result<Option<String>, SdkError> {
+        let session_id = self
+            .session_id
+            .read()
+            .or(Err(SdkError::CouldNotGetSessionId))?;
+
+        Ok(session_id.clone())
     }
 
-    pub fn get_session_id(&self) -> Option<String> {
-        self.session_id.clone()
+    pub async fn send_text_message(&self, message: &PlainText) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Msg::send_text_message(&self.tr_id, &self.sb_tx, &mut internal_rx, message).await
     }
 
-    pub async fn send_text_message(
-        &self,
-        message: &PlainText,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut tr_id = self.tr_id.lock().await;
-        Msg::send_text_message(&mut tr_id, &self.sb_tx, &self.internal_tx, message).await
+    pub async fn send_nudge(&self) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Msg::send_nudge(&self.tr_id, &self.sb_tx, &mut internal_rx).await
     }
 
-    pub async fn send_nudge(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut tr_id = self.tr_id.lock().await;
-        Msg::send_nudge(&mut tr_id, &self.sb_tx, &self.internal_tx).await
-    }
-
-    pub async fn send_typing_user(
-        &self,
-        email: &String,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut tr_id = self.tr_id.lock().await;
-        Msg::send_typing_user(&mut tr_id, &self.sb_tx, email).await
+    pub async fn send_typing_user(&self, email: &String) -> Result<(), SdkError> {
+        Msg::send_typing_user(&self.tr_id, &self.sb_tx, email).await
     }
 
     pub async fn request_contact_display_picture(
         &self,
         email: &String,
         msn_object: &String,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut tr_id = self.tr_id.lock().await;
-        let mut session = DisplayPictureSession::new();
-        let mut internal_rx = self.internal_tx.subscribe();
+    ) -> Result<(), SdkError> {
+        let user_email;
+        {
+            let user_data = self
+                .user_data
+                .lock()
+                .or(Err(SdkError::CouldNotGetUserData))?;
 
-        let invite = session.invite(email, &self.user_email, msn_object)?;
-        Msg::send_p2p(&mut tr_id, &self.sb_tx, &self.internal_tx, invite, email).await?;
+            user_email = user_data
+                .email
+                .as_ref()
+                .ok_or(SdkError::NotLoggedIn)?
+                .clone();
+        }
+
+        let mut internal_rx = self.internal_tx.subscribe();
+        let mut session = DisplayPictureSession::new();
+        let invite = session.invite(email, &user_email, msn_object)?;
+
+        Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, invite, email).await?;
 
         while let Ok(event) = internal_rx.recv().await {
             if let InternalEvent::P2POk {
@@ -381,12 +411,12 @@ impl Switchboard {
                 message: ok,
             } = event
             {
-                if destination != self.user_email {
+                if destination != *user_email {
                     continue;
                 }
 
                 let ack = DisplayPictureSession::acknowledge(ok)?;
-                Msg::send_p2p(&mut tr_id, &self.sb_tx, &self.internal_tx, ack, email).await?;
+                Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
                 break;
             }
         }
@@ -397,12 +427,12 @@ impl Switchboard {
                 message: data_preparation,
             } = event
             {
-                if destination != self.user_email {
+                if destination != *user_email {
                     continue;
                 }
 
                 let ack = DisplayPictureSession::acknowledge(data_preparation)?;
-                Msg::send_p2p(&mut tr_id, &self.sb_tx, &self.internal_tx, ack, email).await?;
+                Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
                 break;
             }
         }
@@ -414,39 +444,44 @@ impl Switchboard {
                 message: data,
             } = event
             {
-                if destination != self.user_email {
+                if destination != *user_email {
                     continue;
                 }
 
                 let binary_header = data[..48].to_vec();
                 let mut cursor = Cursor::new(binary_header);
-                let (_, binary_header) = BinaryHeader::from_reader((&mut cursor, 0))?;
+                let (_, binary_header) = BinaryHeader::from_reader((&mut cursor, 0))
+                    .or(Err(SdkError::BinaryHeaderReadingError))?;
 
                 picture.extend_from_slice(&data[..(data.len() - 4)]);
                 if picture.len() >= binary_header.total_data_size as usize {
                     let ack = DisplayPictureSession::acknowledge(data)?;
-                    Msg::send_p2p(&mut tr_id, &self.sb_tx, &self.internal_tx, ack, email).await?;
+                    Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
                     break;
                 }
             }
         }
 
-        let bye = session.bye(email, &self.user_email)?;
-        Msg::send_p2p(&mut tr_id, &self.sb_tx, &self.internal_tx, bye, email).await?;
+        let bye = session.bye(email, &user_email)?;
+        Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, bye, email).await?;
 
         self.event_tx
             .send(Event::DisplayPicture {
                 email: email.to_owned(),
                 data: picture,
             })
-            .await?;
+            .await
+            .or(Err(SdkError::TransmittingError))?;
 
         Ok(())
     }
 
-    pub async fn disconnect(&self) -> Result<(), SendError<Vec<u8>>> {
+    pub async fn disconnect(&self) -> Result<(), SdkError> {
         let command = "OUT\r\n";
         trace!("C: {command}");
-        self.sb_tx.send(command.as_bytes().to_vec()).await
+        self.sb_tx
+            .send(command.as_bytes().to_vec())
+            .await
+            .or(Err(SdkError::TransmittingError))
     }
 }

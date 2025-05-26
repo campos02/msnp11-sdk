@@ -94,11 +94,11 @@ async fn login() {
                 assert_eq!(display_name, "Bob");
                 assert_eq!(
                     presence,
-                    msnp11_sdk::models::presence::Presence {
+                    std::sync::Arc::new(msnp11_sdk::models::presence::Presence {
                         presence: "NLN".to_string(),
                         client_id: 1073741824,
                         msn_object: Some("<msnobj Creator=\"".to_string())
-                    }
+                    })
                 );
             }
 

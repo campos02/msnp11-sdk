@@ -7,8 +7,13 @@ use core::str;
 use deku::DekuContainerRead;
 use std::io::Cursor;
 
-pub fn into_event(message: &String) -> Event {
-    let command = message
+pub fn into_event(base64_message: &String) -> Option<Event> {
+    let message_bytes = STANDARD
+        .decode(base64_message)
+        .expect("Could not decode socket message from base64");
+
+    let reply = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) }.to_string();
+    let command = reply
         .lines()
         .next()
         .expect("Could not get command from server message")
@@ -18,53 +23,53 @@ pub fn into_event(message: &String) -> Event {
     let args: Vec<&str> = command.trim().split(' ').collect();
     match args[0] {
         "MSG" => {
-            let payload = message.replace(command.as_str(), "");
+            let payload = reply.replace(command.as_str(), "");
             let Some(content_type) = payload.lines().nth(1) else {
-                return Event::ServerReply;
+                return None;
             };
 
             if content_type.contains("text/plain") {
-                return Event::TextMessage {
+                return Some(Event::TextMessage {
                     email: args[1].to_string(),
                     message: PlainText::new(payload),
-                };
+                });
             }
 
             if content_type.contains("text/x-msnmsgr-datacast") {
                 let text = payload.split("\r\n\r\n").nth(1).unwrap_or("");
                 if text == "ID: 1" {
-                    return Event::Nudge {
+                    return Some(Event::Nudge {
                         email: args[1].to_string(),
-                    };
+                    });
                 }
             }
 
             if content_type.contains("text/x-msmsgscontrol") {
                 let Some(typing_user) = payload.lines().nth(2) else {
-                    return Event::ServerReply;
+                    return None;
                 };
 
-                return Event::TypingNotification {
+                return Some(Event::TypingNotification {
                     email: typing_user.replace("TypingUser: ", ""),
-                };
+                });
             }
 
-            Event::ServerReply
+            None
         }
 
-        "JOI" => Event::ParticipantInSwitchboard {
+        "JOI" => Some(Event::ParticipantInSwitchboard {
             email: args[1].to_string(),
-        },
+        }),
 
-        "IRO" => Event::ParticipantInSwitchboard {
+        "IRO" => Some(Event::ParticipantInSwitchboard {
             email: args[4].to_string(),
-        },
+        }),
 
-        "BYE" => Event::ParticipantLeftSwitchboard {
+        "BYE" => Some(Event::ParticipantLeftSwitchboard {
             email: args[1].to_string(),
-        },
+        }),
 
-        _ => Event::ServerReply,
+        _ => None,
     }
 }
 

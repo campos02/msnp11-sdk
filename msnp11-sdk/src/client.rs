@@ -1,10 +1,9 @@
-use crate::connection_error::ConnectionError;
 use crate::event::Event;
 use crate::internal_event::InternalEvent;
 use crate::list::List;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
-use crate::msnp_error::MsnpError;
+use crate::models::user_data::UserData;
 use crate::notification_server::commands::adc::Adc;
 use crate::notification_server::commands::adg::Adg;
 use crate::notification_server::commands::blp::Blp;
@@ -25,27 +24,28 @@ use crate::notification_server::commands::ver::Ver;
 use crate::notification_server::commands::xfr::Xfr;
 use crate::notification_server::event_matcher::{into_event, into_internal_event};
 use crate::passport_auth::PassportAuth;
+use crate::receive_split_into_base64::receive_split_into_base64;
+use crate::sdk_error::SdkError;
 use crate::switchboard::switchboard::Switchboard;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use log::trace;
 use std::error::Error;
+use std::sync::atomic::AtomicU32;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::tcp::OwnedReadHalf;
+use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpStream, lookup_host};
-use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{broadcast, mpsc};
 
+#[derive(uniffi::Object)]
 pub struct Client {
-    event_tx: mpsc::Sender<Event>,
-    event_rx: mpsc::Receiver<Event>,
+    event_tx: async_channel::Sender<Event>,
+    event_rx: async_channel::Receiver<Event>,
     ns_tx: mpsc::Sender<Vec<u8>>,
     internal_tx: broadcast::Sender<InternalEvent>,
-    tr_id: usize,
-    user_email: Option<String>,
-    display_picture: Option<Vec<u8>>,
-    msn_object: Option<String>,
+    tr_id: Arc<AtomicU32>,
+    user_data: Arc<Mutex<UserData>>,
 }
 
 impl Client {
@@ -53,25 +53,34 @@ impl Client {
         let server_ip = lookup_host(format!("{server}:{port}"))
             .await?
             .next()
-            .ok_or(ConnectionError::ResolutionError)?
+            .ok_or(SdkError::ResolutionError)?
             .ip()
             .to_string();
 
-        let (event_tx, event_rx) = mpsc::channel::<Event>(64);
+        let (event_tx, event_rx) = async_channel::bounded::<Event>(32);
         let (ns_tx, mut ns_rx) = mpsc::channel::<Vec<u8>>(16);
-        let (internal_tx, _) = broadcast::channel::<InternalEvent>(64);
+        let (internal_tx, _) = broadcast::channel::<InternalEvent>(32);
 
         let socket = TcpStream::connect(format!("{server_ip}:{port}")).await?;
         let (mut rd, mut wr) = socket.into_split();
 
         let internal_task_tx = internal_tx.clone();
+        let event_task_tx = event_tx.clone();
         tokio::spawn(async move {
-            while let Ok(base64_messages) = Self::socket_messages_to_base64(&mut rd).await {
+            while let Ok(base64_messages) = receive_split_into_base64(&mut rd).await {
                 for base64_message in base64_messages {
                     let internal_event = into_internal_event(&base64_message);
                     internal_task_tx
                         .send(internal_event)
                         .expect("Error sending internal event to channel");
+
+                    let event = into_event(&base64_message);
+                    if let Some(event) = event {
+                        event_task_tx
+                            .send(event)
+                            .await
+                            .expect("Error sending event to channel");
+                    }
                 }
             }
         });
@@ -89,92 +98,9 @@ impl Client {
             event_rx,
             ns_tx,
             internal_tx,
-            tr_id: 0,
-            user_email: None,
-            display_picture: None,
-            msn_object: None,
+            tr_id: Arc::new(AtomicU32::new(0)),
+            user_data: Arc::new(Mutex::new(UserData::new())),
         })
-    }
-
-    pub async fn receive_event(&mut self) -> Result<Event, ConnectionError> {
-        self.event_rx
-            .recv()
-            .await
-            .ok_or(ConnectionError::Disconnected)
-    }
-
-    pub fn event_queue_size(&self) -> usize {
-        self.event_rx.len()
-    }
-
-    pub(crate) async fn socket_messages_to_base64(
-        rd: &mut OwnedReadHalf,
-    ) -> Result<Vec<String>, ConnectionError> {
-        let mut buf = vec![0; 1664];
-        let received = rd.read(&mut buf).await.unwrap_or(0);
-
-        if received == 0 {
-            return Err(ConnectionError::Disconnected);
-        }
-
-        let mut messages_bytes = buf[..received].to_vec();
-        let mut base64_messages: Vec<String> = Vec::new();
-
-        loop {
-            let messages_string = unsafe { str::from_utf8_unchecked(&messages_bytes) };
-            let messages: Vec<String> = messages_string
-                .lines()
-                .map(|line| line.to_string() + "\r\n")
-                .collect();
-
-            if messages.len() == 0 {
-                break;
-            }
-
-            let args: Vec<&str> = messages[0].trim().split(' ').collect();
-            match args[0] {
-                "GCF" | "UBX" | "MSG" => {
-                    let length_index = match args[0] {
-                        "UBX" => 2,
-                        _ => 3,
-                    };
-
-                    let Ok(length) = args[length_index].parse::<usize>() else {
-                        continue;
-                    };
-
-                    let length = messages[0].len() + length;
-                    if length > messages_bytes.len() {
-                        let mut buf = vec![0; 1664];
-                        let received = rd.read(&mut buf).await.unwrap_or(0);
-
-                        if received == 0 {
-                            return Err(ConnectionError::Disconnected);
-                        }
-
-                        let mut buf = buf[..received].to_vec();
-                        messages_bytes.append(&mut buf);
-                        continue;
-                    }
-
-                    let new_bytes = messages_bytes[..length].to_vec();
-                    messages_bytes = messages_bytes[length..].to_vec();
-
-                    let base64_message = STANDARD.encode(&new_bytes);
-                    base64_messages.push(base64_message);
-                }
-
-                _ => {
-                    let new_bytes = messages_bytes[..messages[0].len()].to_vec();
-                    messages_bytes = messages_bytes[messages[0].len()..].to_vec();
-
-                    let base64_message = STANDARD.encode(&new_bytes);
-                    base64_messages.push(base64_message);
-                }
-            }
-        }
-
-        Ok(base64_messages)
     }
 
     fn start_pinging(&self) {
@@ -184,7 +110,6 @@ impl Client {
 
         tokio::spawn(async move {
             let command = "PNG\r\n";
-
             while ns_tx.send(command.as_bytes().to_vec()).await.is_ok() {
                 trace!("C: {command}");
 
@@ -196,7 +121,6 @@ impl Client {
                         "QNG" => {
                             let duration = args[1].parse().unwrap_or(50);
                             tokio::time::sleep(Duration::from_secs(duration)).await;
-
                             break;
                         }
 
@@ -212,26 +136,28 @@ impl Client {
         });
     }
 
-    fn listen_to_internal_events(
-        &self,
-        mut internal_rx: broadcast::Receiver<InternalEvent>,
-    ) -> Result<(), Box<dyn Error>> {
-        let user_email = self.user_email.clone().ok_or(MsnpError::NotLoggedIn)?;
+    async fn handle_switchboard_invitations(&self) -> Result<(), SdkError> {
         let event_tx = self.event_tx.clone();
-        let display_picture = self.display_picture.clone();
-        let msn_object = self.msn_object.clone();
+        let mut internal_rx = self.internal_tx.subscribe();
+
+        let user_data = self.user_data.clone();
+        let user_email;
+        {
+            let user_data = self
+                .user_data
+                .lock()
+                .or(Err(SdkError::CouldNotGetUserData))?;
+
+            user_email = user_data
+                .email
+                .as_ref()
+                .ok_or(SdkError::NotLoggedIn)?
+                .clone();
+        }
 
         tokio::spawn(async move {
             while let Ok(event) = internal_rx.recv().await {
                 match event {
-                    InternalEvent::ServerReply(reply) => {
-                        let event = into_event(&reply);
-                        event_tx
-                            .send(event)
-                            .await
-                            .expect("Error sending event to channel");
-                    }
-
                     InternalEvent::SwitchboardInvitation {
                         server,
                         port,
@@ -242,19 +168,16 @@ impl Client {
                             server.as_str(),
                             port.as_str(),
                             cki_string.as_str(),
-                            display_picture.clone(),
-                            msn_object.clone(),
-                            user_email.clone(),
+                            user_data.clone(),
                         )
                         .await;
 
-                        if let Ok(mut switchboard) = switchboard {
-                            if switchboard
-                                .answer(user_email.clone(), &session_id)
-                                .await
-                                .is_ok()
-                            {
-                                let _ = event_tx.send(Event::SessionAnswered(switchboard)).await;
+                        if let Ok(switchboard) = switchboard {
+                            if switchboard.answer(&user_email, &session_id).await.is_ok() {
+                                event_tx
+                                    .send(Event::SessionAnswered(Arc::new(switchboard)))
+                                    .await
+                                    .expect("Could not send invitation event to channel");
                             }
                         }
                     }
@@ -266,27 +189,37 @@ impl Client {
 
         Ok(())
     }
+}
+
+#[uniffi::export]
+impl Client {
+    pub async fn receive_event(&self) -> Result<Event, SdkError> {
+        self.event_rx.recv().await.or(Err(SdkError::Disconnected))
+    }
+
+    pub fn event_queue_size(&self) -> u32 {
+        self.event_rx.len() as u32
+    }
 
     pub async fn login(
-        &mut self,
+        &self,
         email: String,
         password: String,
         nexus_url: String,
-    ) -> Result<Event, Box<dyn Error>> {
-        // Subscribe first so no events are missed
-        let internal_rx = self.internal_tx.subscribe();
+    ) -> Result<Event, SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
 
-        Ver::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx).await?;
-        Cvr::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, &email).await?;
+        Ver::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
+        Cvr::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &email).await?;
 
         let authorization_string =
-            match UsrI::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, &email).await? {
+            match UsrI::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &email).await? {
                 InternalEvent::GotAuthorizationString(authorization_string) => authorization_string,
                 InternalEvent::RedirectedTo { server, port } => {
                     return Ok(Event::RedirectedTo { server, port });
                 }
 
-                _ => return Err(MsnpError::CouldNotGetAuthenticationString.into()),
+                _ => return Err(SdkError::CouldNotGetAuthenticationString.into()),
             };
 
         let auth = PassportAuth::new(nexus_url);
@@ -294,55 +227,65 @@ impl Client {
             .get_passport_token(&email, password, authorization_string)
             .await?;
 
-        UsrS::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, &token).await?;
+        UsrS::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &token).await?;
 
-        self.user_email = Some(email);
-        self.listen_to_internal_events(internal_rx)?;
+        {
+            let mut user_data = self
+                .user_data
+                .lock()
+                .or(Err(SdkError::CouldNotSetUserData))?;
+
+            user_data.email = Some(email);
+        }
+
+        Syn::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
+        Gcf::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
+
+        self.handle_switchboard_invitations().await?;
         self.start_pinging();
-
-        Syn::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx).await?;
-        Gcf::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx).await?;
 
         Ok(Event::Authenticated)
     }
 
-    pub async fn set_presence(&mut self, presence: String) -> Result<(), Box<dyn Error>> {
-        let presence = Presence::new(presence, self.msn_object.clone());
-        Chg::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, &presence).await
+    pub async fn set_presence(&self, presence: String) -> Result<(), SdkError> {
+        let msn_object;
+        {
+            let user_data = self
+                .user_data
+                .lock()
+                .or(Err(SdkError::CouldNotSetUserData))?;
+
+            msn_object = user_data.msn_object.clone();
+        }
+        let mut internal_rx = self.internal_tx.subscribe();
+
+        let presence = Presence::new(presence, msn_object);
+        Chg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &presence).await
     }
 
     pub async fn set_personal_message(
-        &mut self,
+        &self,
         personal_message: &PersonalMessage,
-    ) -> Result<(), Box<dyn Error>> {
-        Uux::send(
-            &mut self.tr_id,
-            &self.ns_tx,
-            &self.internal_tx,
-            personal_message,
-        )
-        .await
+    ) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Uux::send(&self.tr_id, &self.ns_tx, &mut internal_rx, personal_message).await
     }
 
-    pub async fn set_display_name(&mut self, display_name: &String) -> Result<(), Box<dyn Error>> {
-        Prp::send(
-            &mut self.tr_id,
-            &self.ns_tx,
-            &self.internal_tx,
-            display_name,
-        )
-        .await
+    pub async fn set_display_name(&self, display_name: &String) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Prp::send(&self.tr_id, &self.ns_tx, &mut internal_rx, display_name).await
     }
 
     pub async fn set_contact_display_name(
-        &mut self,
+        &self,
         guid: &String,
         display_name: &String,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
         Sbp::send(
-            &mut self.tr_id,
+            &self.tr_id,
             &self.ns_tx,
-            &self.internal_tx,
+            &mut internal_rx,
             guid,
             display_name,
         )
@@ -350,15 +293,16 @@ impl Client {
     }
 
     pub async fn add_contact(
-        &mut self,
+        &self,
         email: &String,
         display_name: &String,
         list: List,
-    ) -> Result<Event, Box<dyn Error>> {
+    ) -> Result<Event, SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
         Adc::send(
-            &mut self.tr_id,
+            &self.tr_id,
             &self.ns_tx,
-            &self.internal_tx,
+            &mut internal_rx,
             email,
             display_name,
             list,
@@ -366,136 +310,124 @@ impl Client {
         .await
     }
 
-    pub async fn remove_contact(
-        &mut self,
-        email: &String,
-        list: List,
-    ) -> Result<(), Box<dyn Error>> {
-        Rem::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, email, list).await
+    pub async fn remove_contact(&self, email: &String, list: List) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Rem::send(&self.tr_id, &self.ns_tx, &mut internal_rx, email, list).await
     }
 
-    pub async fn remove_contact_from_forward_list(
-        &mut self,
-        guid: &String,
-    ) -> Result<(), Box<dyn Error>> {
-        Rem::send_with_forward_list(&mut self.tr_id, &self.ns_tx, &self.internal_tx, guid).await
+    pub async fn remove_contact_from_forward_list(&self, guid: &String) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Rem::send_with_forward_list(&self.tr_id, &self.ns_tx, &mut internal_rx, guid).await
     }
 
-    pub async fn block_contact(&mut self, email: &String) -> Result<(), Box<dyn Error>> {
+    pub async fn block_contact(&self, email: &String) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
         Adc::send(
-            &mut self.tr_id,
+            &self.tr_id,
             &self.ns_tx,
-            &self.internal_tx,
+            &mut internal_rx,
             email,
-            &"".to_string(),
+            email,
             List::BlockList,
         )
         .await?;
 
         Rem::send(
-            &mut self.tr_id,
+            &self.tr_id,
             &self.ns_tx,
-            &self.internal_tx,
+            &mut internal_rx,
             email,
             List::AllowList,
         )
         .await
     }
 
-    pub async fn unblock_contact(&mut self, email: &String) -> Result<(), Box<dyn Error>> {
+    pub async fn unblock_contact(&self, email: &String) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
         Adc::send(
-            &mut self.tr_id,
+            &self.tr_id,
             &self.ns_tx,
-            &self.internal_tx,
+            &mut internal_rx,
             email,
-            &"".to_string(),
+            email,
             List::AllowList,
         )
         .await?;
 
         Rem::send(
-            &mut self.tr_id,
+            &self.tr_id,
             &self.ns_tx,
-            &self.internal_tx,
+            &mut internal_rx,
             email,
             List::BlockList,
         )
         .await
     }
 
-    pub async fn create_group(&mut self, name: &String) -> Result<(), Box<dyn Error>> {
-        Adg::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, name).await
+    pub async fn create_group(&self, name: &String) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Adg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, name).await
     }
 
-    pub async fn delete_group(&mut self, guid: &String) -> Result<(), Box<dyn Error>> {
-        Rmg::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, guid).await
+    pub async fn delete_group(&self, guid: &String) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Rmg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, guid).await
     }
 
-    pub async fn rename_group(
-        &mut self,
-        guid: &String,
-        new_name: &String,
-    ) -> Result<(), Box<dyn Error>> {
-        Reg::send(
-            &mut self.tr_id,
-            &self.ns_tx,
-            &self.internal_tx,
-            guid,
-            new_name,
-        )
-        .await
+    pub async fn rename_group(&self, guid: &String, new_name: &String) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Reg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, new_name).await
     }
 
     pub async fn add_contact_to_group(
-        &mut self,
+        &self,
         guid: &String,
         group_guid: &String,
-    ) -> Result<(), Box<dyn Error>> {
-        Adc::send_with_group(
-            &mut self.tr_id,
-            &self.ns_tx,
-            &self.internal_tx,
-            guid,
-            group_guid,
-        )
-        .await
+    ) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Adc::send_with_group(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, group_guid).await
     }
 
     pub async fn remove_contact_from_group(
-        &mut self,
+        &self,
         guid: &String,
         group_guid: &String,
-    ) -> Result<(), Box<dyn Error>> {
-        Rem::send_with_group(
-            &mut self.tr_id,
+    ) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Rem::send_with_group(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, group_guid).await
+    }
+
+    pub async fn set_gtc(&self, gtc: &String) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Gtc::send(&self.tr_id, &self.ns_tx, &mut internal_rx, gtc).await
+    }
+
+    pub async fn set_blp(&self, blp: &String) -> Result<(), SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        Blp::send(&self.tr_id, &self.ns_tx, &mut internal_rx, blp).await
+    }
+
+    pub async fn create_session(&self, email: &String) -> Result<Switchboard, SdkError> {
+        let mut internal_rx = self.internal_tx.subscribe();
+        let user_email;
+        {
+            let user_data = self
+                .user_data
+                .lock()
+                .or(Err(SdkError::CouldNotGetUserData))?;
+
+            user_email = user_data
+                .email
+                .as_ref()
+                .ok_or(SdkError::NotLoggedIn)?
+                .clone();
+        }
+
+        let switchboard = Xfr::send(
+            &self.tr_id,
             &self.ns_tx,
-            &self.internal_tx,
-            guid,
-            group_guid,
-        )
-        .await
-    }
-
-    pub async fn set_gtc(&mut self, gtc: &String) -> Result<(), Box<dyn Error>> {
-        Gtc::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, gtc).await
-    }
-
-    pub async fn set_blp(&mut self, blp: &String) -> Result<(), Box<dyn Error>> {
-        Blp::send(&mut self.tr_id, &self.ns_tx, &self.internal_tx, blp).await
-    }
-
-    pub async fn create_session(
-        &mut self,
-        email: &String,
-    ) -> Result<Switchboard, Box<dyn Error + Send + Sync>> {
-        let user_email = self.user_email.clone().ok_or(MsnpError::NotLoggedIn)?;
-        let mut switchboard = Xfr::send(
-            &mut self.tr_id,
-            &self.ns_tx,
-            &self.internal_tx,
-            &self.display_picture,
-            &self.msn_object,
-            &user_email,
+            &mut internal_rx,
+            self.user_data.clone(),
         )
         .await?;
 
@@ -504,8 +436,13 @@ impl Client {
         Ok(switchboard)
     }
 
-    pub fn set_display_picture(&mut self, display_picture: Vec<u8>) -> Result<(), Box<dyn Error>> {
-        let user_email = self.user_email.clone().ok_or(MsnpError::NotLoggedIn)?;
+    pub async fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<(), SdkError> {
+        let mut user_data = self
+            .user_data
+            .lock()
+            .or(Err(SdkError::CouldNotSetUserData))?;
+
+        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
 
         let mut hash = sha1_smol::Sha1::new();
         hash.update(display_picture.as_slice());
@@ -520,18 +457,20 @@ impl Client {
         hash.update(sha1c.as_bytes());
         let sha1c = STANDARD.encode(hash.digest().to_string());
 
-        self.msn_object = Some(format!(
+        user_data.msn_object = Some(format!(
             "<msnobj Creator=\"{user_email}\" Size=\"{}\" Type=\"3\" Location=\"PIC.tmp\" Friendly=\"AAA=\" SHA1D=\"{sha1d}\" SHA1C=\"{sha1c}\"/>",
             display_picture.len()
         ));
 
-        self.display_picture = Some(display_picture);
         Ok(())
     }
 
-    pub async fn disconnect(&self) -> Result<(), SendError<Vec<u8>>> {
+    pub async fn disconnect(&self) -> Result<(), SdkError> {
         let command = "OUT\r\n";
         trace!("C: {command}");
-        self.ns_tx.send(command.as_bytes().to_vec()).await
+        self.ns_tx
+            .send(command.as_bytes().to_vec())
+            .await
+            .or(Err(SdkError::TransmittingError))
     }
 }

@@ -1,29 +1,33 @@
-use crate::connection_error::ConnectionError;
 use crate::internal_event::InternalEvent;
-use crate::msnp_error::MsnpError;
+use crate::sdk_error::SdkError;
 use log::trace;
-use std::error::Error;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::{broadcast, mpsc};
 
 pub struct Adg;
 
 impl Adg {
     pub async fn send(
-        tr_id: &mut usize,
+        tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
-        internal_tx: &broadcast::Sender<InternalEvent>,
+        internal_rx: &mut broadcast::Receiver<InternalEvent>,
         name: &String,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut internal_rx = internal_tx.subscribe();
-        let group_name = urlencoding::encode(name).to_string();
+    ) -> Result<(), SdkError> {
+        tr_id.fetch_add(1, Ordering::SeqCst);
+        let tr_id = tr_id.load(Ordering::SeqCst);
 
-        *tr_id += 1;
+        let group_name = urlencoding::encode(name);
         let command = format!("ADG {tr_id} {group_name}\r\n");
+        ns_tx
+            .send(command.as_bytes().to_vec())
+            .await
+            .or(Err(SdkError::TransmittingError))?;
 
-        ns_tx.send(command.as_bytes().to_vec()).await?;
         trace!("C: {command}");
 
-        while let InternalEvent::ServerReply(reply) = internal_rx.recv().await? {
+        while let InternalEvent::ServerReply(reply) =
+            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        {
             trace!("S: {reply}");
 
             let args: Vec<&str> = reply.trim().split(' ').collect();
@@ -36,13 +40,13 @@ impl Adg {
 
                 "228" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::InvalidArgument.into());
+                        return Err(SdkError::InvalidArgument.into());
                     }
                 }
 
                 "603" => {
                     if args[1] == tr_id.to_string() {
-                        return Err(MsnpError::ServerError.into());
+                        return Err(SdkError::ServerError.into());
                     }
                 }
 
@@ -50,6 +54,6 @@ impl Adg {
             }
         }
 
-        Err(ConnectionError::Disconnected.into())
+        Err(SdkError::Disconnected.into())
     }
 }

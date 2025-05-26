@@ -1,4 +1,4 @@
-use crate::msnp_error::MsnpError;
+use crate::sdk_error::SdkError;
 use reqwest::header::{AUTHORIZATION, HeaderMap};
 use std::error::Error;
 
@@ -36,18 +36,28 @@ impl PassportAuth {
         email: &String,
         password: String,
         authorization_string: String,
-    ) -> Result<String, Box<dyn Error>> {
-        let login_srf = self.get_login_srf().await?;
+    ) -> Result<String, SdkError> {
+        let login_srf = self
+            .get_login_srf()
+            .await
+            .or(Err(SdkError::CouldNotGetAuthenticationString))?;
 
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, format!("Passport1.4 OrgVerb=GET,OrgURL=http%3A%2F%2Fmessenger%2Emsn%2Ecom,sign-in={email},pwd={password},{authorization_string}").parse()?);
+        headers.insert(AUTHORIZATION, format!("Passport1.4 OrgVerb=GET,OrgURL=http%3A%2F%2Fmessenger%2Emsn%2Ecom,sign-in={email},pwd={password},{authorization_string}").parse().or(Err(SdkError::CouldNotGetAuthenticationString))?);
 
-        let response = self.client.get(login_srf).headers(headers).send().await?;
+        let response = self
+            .client
+            .get(login_srf)
+            .headers(headers)
+            .send()
+            .await
+            .or(Err(SdkError::ReceivingError))?;
         let authentication_info = response
             .headers()
             .get("Authentication-Info")
-            .ok_or(MsnpError::AuthenticationHeaderNotFound)?
-            .to_str()?;
+            .ok_or(SdkError::AuthenticationHeaderNotFound)?
+            .to_str()
+            .or(Err(SdkError::CouldNotGetAuthenticationString))?;
 
         let token = authentication_info
             .split("from-PP='")
