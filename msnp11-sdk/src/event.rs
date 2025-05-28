@@ -41,7 +41,7 @@ pub enum Event {
     PresenceUpdate {
         email: String,
         display_name: String,
-        presence: Arc<Presence>,
+        presence: Presence,
     },
 
     PersonalMessageUpdate {

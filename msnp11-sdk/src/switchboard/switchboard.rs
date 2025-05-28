@@ -1,4 +1,5 @@
 use crate::event::Event;
+use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
 use crate::models::user_data::UserData;
@@ -332,16 +333,29 @@ impl Switchboard {
         *session_id_lock = Some(session_id.to_owned());
         Ok(())
     }
+
+    pub fn add_event_handler_closure<F>(&self, f: F)
+    where
+        F: Fn(Event) + Send + 'static,
+    {
+        let event_rx = self.event_rx.clone();
+        tokio::spawn(async move {
+            while let Ok(event) = event_rx.recv().await {
+                f(event);
+            }
+        });
+    }
 }
 
 #[uniffi::export]
 impl Switchboard {
-    pub async fn receive_event(&self) -> Result<Event, SdkError> {
-        self.event_rx.recv().await.or(Err(SdkError::Disconnected))
-    }
-
-    pub fn event_queue_size(&self) -> u32 {
-        self.event_rx.len() as u32
+    pub fn add_event_handler(&self, handler: Arc<dyn EventHandler>) {
+        let event_rx = self.event_rx.clone();
+        tokio::spawn(async move {
+            while let Ok(event) = event_rx.recv().await {
+                handler.handle(event).await;
+            }
+        });
     }
 
     pub async fn invite(&self, email: &String) -> Result<(), SdkError> {

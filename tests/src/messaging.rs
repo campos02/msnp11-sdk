@@ -48,33 +48,29 @@ async fn create_session() {
 
     switchboard.send_text_message(&message).await.unwrap();
 
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    assert!(switchboard.event_queue_size() >= 4);
-
-    for _ in 0..switchboard.event_queue_size() {
-        match switchboard.receive_event().await.unwrap() {
-            msnp11_sdk::event::Event::ParticipantInSwitchboard { email } => {
-                assert_eq!(email, "bob@passport.com");
-            }
-
-            msnp11_sdk::event::Event::TextMessage { email, message } => {
-                assert_eq!(email, "bob@passport.com");
-                assert_eq!(message.color, "ff0000");
-                assert_eq!(message.text, "h");
-            }
-
-            msnp11_sdk::event::Event::Nudge { email } => {
-                assert_eq!(email, "bob@passport.com");
-            }
-
-            msnp11_sdk::event::Event::ParticipantLeftSwitchboard { email } => {
-                assert_eq!(email, "bob@passport.com");
-            }
-
-            _ => (),
+    switchboard.add_event_handler_closure(|event| match event {
+        msnp11_sdk::event::Event::ParticipantInSwitchboard { email } => {
+            assert_eq!(email, "bob@passport.com");
         }
-    }
 
+        msnp11_sdk::event::Event::TextMessage { email, message } => {
+            assert_eq!(email, "bob@passport.com");
+            assert_eq!(message.color, "ff0000");
+            assert_eq!(message.text, "h");
+        }
+
+        msnp11_sdk::event::Event::Nudge { email } => {
+            assert_eq!(email, "bob@passport.com");
+        }
+
+        msnp11_sdk::event::Event::ParticipantLeftSwitchboard { email } => {
+            assert_eq!(email, "bob@passport.com");
+        }
+
+        _ => (),
+    });
+
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     switchboard.disconnect().await.unwrap();
     client.disconnect().await.unwrap();
 }
@@ -114,43 +110,35 @@ async fn join_session() {
 
     // GTC abuse from the mock server
     client.set_gtc(&"ReceiveRNG".to_string()).await.unwrap();
-    loop {
-        match client.receive_event().await.unwrap() {
-            msnp11_sdk::event::Event::SessionAnswered(switchboard) => {
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                assert!(switchboard.event_queue_size() >= 4);
 
-                for _ in 0..switchboard.event_queue_size() {
-                    match switchboard.receive_event().await.unwrap() {
-                        msnp11_sdk::event::Event::ParticipantInSwitchboard { email } => {
-                            assert_eq!(email, "bob@passport.com");
-                        }
-
-                        msnp11_sdk::event::Event::TextMessage { email, message } => {
-                            assert_eq!(email, "bob@passport.com");
-                            assert_eq!(message.color, "ff0000");
-                            assert_eq!(message.text, "h");
-                        }
-
-                        msnp11_sdk::event::Event::Nudge { email } => {
-                            assert_eq!(email, "bob@passport.com");
-                        }
-
-                        msnp11_sdk::event::Event::ParticipantLeftSwitchboard { email } => {
-                            assert_eq!(email, "bob@passport.com");
-                        }
-
-                        _ => (),
-                    }
+    client.add_event_handler_closure(|event| match event {
+        msnp11_sdk::event::Event::SessionAnswered(switchboard) => {
+            switchboard.add_event_handler_closure(|event| match event {
+                msnp11_sdk::event::Event::ParticipantInSwitchboard { email } => {
+                    assert_eq!(email, "bob@passport.com");
                 }
 
-                switchboard.disconnect().await.unwrap();
-                break;
-            }
+                msnp11_sdk::event::Event::TextMessage { email, message } => {
+                    assert_eq!(email, "bob@passport.com");
+                    assert_eq!(message.color, "ff0000");
+                    assert_eq!(message.text, "h");
+                }
 
-            _ => (),
+                msnp11_sdk::event::Event::Nudge { email } => {
+                    assert_eq!(email, "bob@passport.com");
+                }
+
+                msnp11_sdk::event::Event::ParticipantLeftSwitchboard { email } => {
+                    assert_eq!(email, "bob@passport.com");
+                }
+
+                _ => (),
+            });
         }
-    }
 
+        _ => (),
+    });
+
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     client.disconnect().await.unwrap();
 }

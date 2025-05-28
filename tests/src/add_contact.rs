@@ -71,20 +71,18 @@ async fn add_contact() {
         assert_eq!(lists, vec![msnp11_sdk::list::List::AllowList]);
     }
 
-    assert!(client.event_queue_size() >= 1);
-    for _ in 0..client.event_queue_size() {
-        match client.receive_event().await.unwrap() {
-            msnp11_sdk::event::Event::AddedBy {
-                email,
-                display_name,
-            } => {
-                assert_eq!(email, "fred@passport.com");
-                assert_eq!(display_name, "Fred");
-            }
-
-            _ => (),
+    client.add_event_handler_closure(|event| match event {
+        msnp11_sdk::event::Event::AddedBy {
+            email,
+            display_name,
+        } => {
+            assert_eq!(email, "fred@passport.com");
+            assert_eq!(display_name, "Fred");
         }
-    }
 
+        _ => (),
+    });
+
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     client.disconnect().await.unwrap();
 }

@@ -1,5 +1,6 @@
 pub mod client;
 pub mod event;
+pub mod event_handler;
 mod internal_event;
 pub mod list;
 pub mod models;

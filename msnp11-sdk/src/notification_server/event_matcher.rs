@@ -5,7 +5,6 @@ use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
-use std::sync::Arc;
 
 pub fn into_event(base64_message: &String) -> Option<Event> {
     let message_bytes = STANDARD
@@ -125,11 +124,11 @@ pub fn into_event(base64_message: &String) -> Option<Event> {
                 display_name: urlencoding::decode(args[base_index + 3])
                     .expect("Could not url decode contact name")
                     .to_string(),
-                presence: Arc::new(Presence {
+                presence: Presence {
                     presence: args[base_index + 1].to_string(),
                     client_id: args[base_index + 4].to_string().parse().unwrap_or(0),
                     msn_object,
-                }),
+                },
             })
         }
 

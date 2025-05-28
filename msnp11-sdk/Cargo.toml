@@ -1,6 +1,8 @@
 [package]
 name = "msnp11-sdk"
-version = "0.1.0"
+description = "An MSNP11 client SDK"
+license = "MIT"
+version = "0.2.4"
 edition = "2024"
 
 [dependencies]
@@ -17,6 +19,7 @@ deku = "0.19.1"
 sha1_smol = "1.0.1"
 uniffi = { version = "0.29", features = [ "cli" ] }
 async-channel = "2.3.1"
+async-trait = "0.1.88"
 
 [build-dependencies]
 uniffi = { version = "0.29", features = [ "build" ] }
