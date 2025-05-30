@@ -1,3 +1,4 @@
+/// Represents a plain text message. Colors are defined in RGB hex(converted to BGR internally).
 #[derive(Clone, Debug, PartialEq, uniffi::Record)]
 pub struct PlainText {
     pub bold: bool,

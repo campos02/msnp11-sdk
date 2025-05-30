@@ -24,6 +24,8 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc};
 
+/// Represents a messaging session with one or more contacts. The official MSNP clients usually create a new session every time a conversation
+/// window is opened and leave it when it's closed.
 #[derive(Debug, uniffi::Object)]
 pub struct Switchboard {
     event_tx: async_channel::Sender<Event>,
@@ -334,6 +336,8 @@ impl Switchboard {
         Ok(())
     }
 
+    /// Adds a handler closure. If you're using this SDK with Rust, not through a foreign binding, then this is the preferred method of
+    /// handling events.
     pub fn add_event_handler_closure<F>(&self, f: F)
     where
         F: Fn(Event) + Send + 'static,
@@ -349,6 +353,10 @@ impl Switchboard {
 
 #[uniffi::export]
 impl Switchboard {
+    /// Adds a new handler that implements the [EventHandler] trait.
+    ///
+    /// This exists for the foreign language bindings, with which generics don't
+    /// work. Prefer [`add_event_handler_closure`][Switchboard::add_event_handler_closure] if using this SDK with Rust.
     pub fn add_event_handler(&self, handler: Arc<dyn EventHandler>) {
         let event_rx = self.event_rx.clone();
         tokio::spawn(async move {
@@ -358,6 +366,7 @@ impl Switchboard {
         });
     }
 
+    /// Invites a new contact to this switchboard session. This makes them temporary chat rooms.
     pub async fn invite(&self, email: &String) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
 
@@ -371,6 +380,7 @@ impl Switchboard {
         Ok(())
     }
 
+    /// Returns the session ID, if it's defined.
     pub fn get_session_id(&self) -> Result<Option<String>, SdkError> {
         let session_id = self
             .session_id
@@ -380,20 +390,24 @@ impl Switchboard {
         Ok(session_id.clone())
     }
 
+    /// Sends a plain text message to the session.
     pub async fn send_text_message(&self, message: &PlainText) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         Msg::send_text_message(&self.tr_id, &self.sb_tx, &mut internal_rx, message).await
     }
 
+    /// Sends a nudge to the session.
     pub async fn send_nudge(&self) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         Msg::send_nudge(&self.tr_id, &self.sb_tx, &mut internal_rx).await
     }
 
+    /// Sends an "is writing..." notification to the session.
     pub async fn send_typing_user(&self, email: &String) -> Result<(), SdkError> {
         Msg::send_typing_user(&self.tr_id, &self.sb_tx, email).await
     }
 
+    /// Requests the contact's display picture and handles the transfer process.
     pub async fn request_contact_display_picture(
         &self,
         email: &String,
@@ -490,6 +504,7 @@ impl Switchboard {
         Ok(())
     }
 
+    /// Disconnects from the switchboard.
     pub async fn disconnect(&self) -> Result<(), SdkError> {
         let command = "OUT\r\n";
         trace!("C: {command}");

@@ -1,3 +1,4 @@
+/// Represents a contact's presence information.
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct Presence {
     pub presence: String,

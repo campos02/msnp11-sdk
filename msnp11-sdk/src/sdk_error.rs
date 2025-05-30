@@ -1,31 +1,56 @@
 use std::error::Error;
 use std::fmt;
 
+/// Errors the SDK might return.
 #[derive(Debug, Clone, uniffi::Error)]
 pub enum SdkError {
+    /// Could not resolve server name.
     ResolutionError,
+    /// This MSNP version is not supported by the server.
     ProtocolNotSupported,
+    /// Authentication error. Check your email and password.
     ServerIsBusy,
+    /// Server returned an error when logging in.
     ServerError,
+    /// Authentication error. Check your email and password.
     AuthenticationHeaderNotFound,
+    /// Authentication error. Check your email and password.
     CouldNotGetAuthenticationString,
+    /// An invalid argument was sent.
     InvalidArgument,
+    /// Command refers to an invalid contact.
     InvalidContact,
+    /// Message could not be delivered to all recipients.
     MessageNotDelivered,
+    /// The contact you're trying to invite is offline.
     ContactIsOffline,
+    /// Please log in before using this command.
     NotLoggedIn,
+    /// Could not get session participants.
     CouldNotGetParticipants,
+    /// Could not invite contact to session.
     CouldNotInviteContact,
+    /// P2P session kind not supported.
     P2PInviteError,
+    /// Could not get contact display picture.
     CouldNotGetDisplayPicture,
+    /// Lost connection to the server.
     Disconnected,
+    /// Error receiving data.
     ReceivingError,
+    /// Error transmitting data.
     TransmittingError,
+    /// Could not get session ID.
     CouldNotSetSessionId,
+    /// Could not get session ID.
     CouldNotGetSessionId,
+    /// Could not read binary header from P2P message.
     BinaryHeaderReadingError,
+    /// Could not write user data.
     CouldNotSetUserData,
+    /// Could not retrieve user data.
     CouldNotGetUserData,
+    /// Could not connect to the server.
     CouldNotConnectToServer,
 }
 
