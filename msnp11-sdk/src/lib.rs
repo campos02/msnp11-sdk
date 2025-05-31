@@ -61,9 +61,9 @@ pub mod switchboard;
 uniffi::setup_scaffolding!();
 
 pub use client::Client;
-pub use switchboard::switchboard::Switchboard;
 pub use event::Event;
 pub use list::List;
-pub use models::presence::Presence;
 pub use models::personal_message::PersonalMessage;
 pub use models::plain_text::PlainText;
+pub use models::presence::Presence;
+pub use switchboard::switchboard::Switchboard;

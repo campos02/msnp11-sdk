@@ -9,10 +9,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum Event {
     /// The Dispatch Server replied with a command asking to connect to another server.
-    RedirectedTo {
-        server: String,
-        port: String,
-    },
+    RedirectedTo { server: String, port: String },
 
     /// Authenticated successfully.
     Authenticated,
@@ -24,10 +21,7 @@ pub enum Event {
     DisplayName(String),
 
     /// Contact group
-    Group {
-        name: String,
-        guid: String,
-    },
+    Group { name: String, guid: String },
 
     /// Contact not in forward list.
     Contact {
@@ -59,15 +53,10 @@ pub enum Event {
     },
 
     /// A contact has gone offline.
-    ContactOffline {
-        email: String,
-    },
+    ContactOffline { email: String },
 
     /// Added to someone's forward list.
-    AddedBy {
-        email: String,
-        display_name: String,
-    },
+    AddedBy { email: String, display_name: String },
 
     /// Removed from someone's forward list.
     RemovedBy(String),
@@ -76,38 +65,24 @@ pub enum Event {
     SessionAnswered(Arc<Switchboard>),
 
     /// New text message.
-    TextMessage {
-        email: String,
-        message: PlainText,
-    },
+    TextMessage { email: String, message: PlainText },
 
     /// New nudge.
-    Nudge {
-        email: String,
-    },
+    Nudge { email: String },
 
     /// Contact is writing...
-    TypingNotification {
-        email: String,
-    },
+    TypingNotification { email: String },
 
     /// New user joined the switchboard.
-    ParticipantInSwitchboard {
-        email: String,
-    },
+    ParticipantInSwitchboard { email: String },
 
     /// A user left the switchboard.
-    ParticipantLeftSwitchboard {
-        email: String,
-    },
+    ParticipantLeftSwitchboard { email: String },
 
     /// A contact's display picture.
-    DisplayPicture {
-        email: String,
-        data: Vec<u8>,
-    },
+    DisplayPicture { email: String, data: Vec<u8> },
 
-    /// Disconnected because the user logged in in another device. 
+    /// Disconnected because the user logged in in another device.
     LoggedInAnotherDevice,
     /// Lost connection to the server.
     Disconnected,

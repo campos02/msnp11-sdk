@@ -20,7 +20,7 @@ impl PassportAuth {
         let mut url = response
             .headers()
             .get("Passporturls")
-            .unwrap()
+            .ok_or(SdkError::AuthenticationHeaderNotFound)?
             .to_str()?
             .replace("DALogin=", "");
 
@@ -52,6 +52,7 @@ impl PassportAuth {
             .send()
             .await
             .or(Err(SdkError::ReceivingError))?;
+
         let authentication_info = response
             .headers()
             .get("Authentication-Info")
@@ -59,9 +60,12 @@ impl PassportAuth {
             .to_str()
             .or(Err(SdkError::CouldNotGetAuthenticationString))?;
 
-        let token = authentication_info
-            .split("from-PP='")
-            .collect::<Vec<&str>>()[1];
+        let mut token = authentication_info.split("from-PP='");
+        token.next();
+
+        let token = token
+            .next()
+            .ok_or(SdkError::CouldNotGetAuthenticationString)?;
 
         Ok(token.replace("'", ""))
     }

@@ -228,11 +228,11 @@ impl Client {
     }
 
     /// Does the MSNP authentication process. Also starts regular pings and the handler for switchboard invitations.
-    /// 
+    ///
     /// # Events
     /// If the server you're connecting to implements a Dispatch Server, then this will return a [RedirectedTo][Event::RedirectedTo] event.
     /// The proceeding is to [create a new][Client::new] instance with the server and port returned as arguments, then login normally, which
-    /// will return an [Authenticated][Event::Authenticated] event. 
+    /// will return an [Authenticated][Event::Authenticated] event.
     pub async fn login(
         &self,
         email: String,
