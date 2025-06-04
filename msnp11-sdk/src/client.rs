@@ -39,7 +39,6 @@ use tokio::net::{TcpStream, lookup_host};
 use tokio::sync::{broadcast, mpsc};
 
 /// Defines the client itself, all Notification Server actions are done through an instance of this struct.
-#[derive(uniffi::Object)]
 pub struct Client {
     event_tx: async_channel::Sender<Event>,
     event_rx: async_channel::Receiver<Event>,
@@ -209,10 +208,7 @@ impl Client {
             }
         });
     }
-}
 
-#[uniffi::export]
-impl Client {
     /// Adds a new handler that implements the [EventHandler] trait.
     ///
     /// This exists for the foreign language bindings, with which generics don't
@@ -486,7 +482,7 @@ impl Client {
     }
 
     /// Sets the user's display picture. This method uses the picture's binary data, and scaling down to a size like 96x96 is recommended.
-    pub async fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<(), SdkError> {
+    pub fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<(), SdkError> {
         let mut user_data = self
             .user_data
             .lock()

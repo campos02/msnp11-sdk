@@ -349,10 +349,7 @@ impl Switchboard {
             }
         });
     }
-}
 
-#[uniffi::export]
-impl Switchboard {
     /// Adds a new handler that implements the [EventHandler] trait.
     ///
     /// This exists for the foreign language bindings, with which generics don't

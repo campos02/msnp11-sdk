@@ -52,6 +52,8 @@ pub enum SdkError {
     CouldNotGetUserData,
     /// Could not connect to the server.
     CouldNotConnectToServer,
+    /// Could not create runtime.
+    CouldNotCreateRuntime,
 }
 
 impl fmt::Display for SdkError {
@@ -118,6 +120,8 @@ impl fmt::Display for SdkError {
             SdkError::CouldNotSetUserData => write!(f, "Could not write user data"),
 
             SdkError::CouldNotConnectToServer => write!(f, "Could not connect to the server"),
+
+            SdkError::CouldNotCreateRuntime => write!(f, "Could not create runtime"),
         }
     }
 }

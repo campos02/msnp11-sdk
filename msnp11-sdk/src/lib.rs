@@ -46,10 +46,10 @@
 //! [UniFFI](https://mozilla.github.io/uniffi-rs/latest/tutorial/foreign_language_bindings.html#multi-crate-workspaces).
 //!
 
-pub mod build_client;
 pub mod client;
 pub mod event;
 pub mod event_handler;
+mod exports;
 mod internal_event;
 pub mod models;
 pub mod msnp_list;
