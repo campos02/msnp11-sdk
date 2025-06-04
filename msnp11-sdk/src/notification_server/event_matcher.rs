@@ -1,6 +1,6 @@
 use crate::event::Event;
 use crate::internal_event::InternalEvent;
-use crate::list::List;
+use crate::msnp_list::MsnpList;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -48,7 +48,7 @@ pub fn into_event(base64_message: &String) -> Option<Event> {
         }),
 
         "LST" => {
-            let mut lists: Vec<List> = Vec::new();
+            let mut lists: Vec<MsnpList> = Vec::new();
             let lists_number_index = if args.len() > 4 { 4 } else { 3 };
 
             let lists_number = args[lists_number_index]
@@ -56,23 +56,23 @@ pub fn into_event(base64_message: &String) -> Option<Event> {
                 .expect("Found invalid list number");
 
             if lists_number & 1 == 1 {
-                lists.push(List::ForwardList);
+                lists.push(MsnpList::ForwardList);
             }
 
             if lists_number & 2 == 2 {
-                lists.push(List::AllowList);
+                lists.push(MsnpList::AllowList);
             }
 
             if lists_number & 4 == 4 {
-                lists.push(List::BlockList);
+                lists.push(MsnpList::BlockList);
             }
 
             if lists_number & 8 == 8 {
-                lists.push(List::ReverseList);
+                lists.push(MsnpList::ReverseList);
             }
 
             if lists_number & 16 == 16 {
-                lists.push(List::PendingList);
+                lists.push(MsnpList::PendingList);
             }
 
             if lists_number & 1 == 1 {

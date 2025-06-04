@@ -1,7 +1,7 @@
 use crate::event::Event;
 use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
-use crate::list::List;
+use crate::msnp_list::MsnpList;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
 use crate::models::user_data::UserData;
@@ -333,7 +333,7 @@ impl Client {
         &self,
         email: &String,
         display_name: &String,
-        list: List,
+        list: MsnpList,
     ) -> Result<Event, SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         Adc::send(
@@ -349,7 +349,7 @@ impl Client {
 
     /// Removes a contact from a specified list that's not the forward list, that requires a GUID and calling
     /// [remove_contact_from_forward_list][Client::remove_contact_from_forward_list].
-    pub async fn remove_contact(&self, email: &String, list: List) -> Result<(), SdkError> {
+    pub async fn remove_contact(&self, email: &String, list: MsnpList) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         Rem::send(&self.tr_id, &self.ns_tx, &mut internal_rx, email, list).await
     }
@@ -369,7 +369,7 @@ impl Client {
             &mut internal_rx,
             email,
             email,
-            List::BlockList,
+            MsnpList::BlockList,
         )
         .await?;
 
@@ -378,7 +378,7 @@ impl Client {
             &self.ns_tx,
             &mut internal_rx,
             email,
-            List::AllowList,
+            MsnpList::AllowList,
         )
         .await
     }
@@ -392,7 +392,7 @@ impl Client {
             &mut internal_rx,
             email,
             email,
-            List::AllowList,
+            MsnpList::AllowList,
         )
         .await?;
 
@@ -401,7 +401,7 @@ impl Client {
             &self.ns_tx,
             &mut internal_rx,
             email,
-            List::BlockList,
+            MsnpList::BlockList,
         )
         .await
     }

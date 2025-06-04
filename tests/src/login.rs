@@ -58,9 +58,9 @@ async fn login() {
             assert_eq!(
                 lists,
                 vec![
-                    msnp11_sdk::list::List::ForwardList,
-                    msnp11_sdk::list::List::BlockList,
-                    msnp11_sdk::list::List::ReverseList
+                    msnp11_sdk::msnp_list::MsnpList::ForwardList,
+                    msnp11_sdk::msnp_list::MsnpList::BlockList,
+                    msnp11_sdk::msnp_list::MsnpList::ReverseList
                 ]
             )
         }
@@ -72,7 +72,7 @@ async fn login() {
         } => {
             assert_eq!(email, "fred@passport.com");
             assert_eq!(display_name, "Fred");
-            assert_eq!(lists, vec![msnp11_sdk::list::List::AllowList])
+            assert_eq!(lists, vec![msnp11_sdk::msnp_list::MsnpList::AllowList])
         }
 
         msnp11_sdk::event::Event::PresenceUpdate {

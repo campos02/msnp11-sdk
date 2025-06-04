@@ -41,7 +41,7 @@ async fn add_contact() {
         .add_contact(
             &"bob@passport.com".to_string(),
             &"Bob".to_string(),
-            msnp11_sdk::list::List::ForwardList,
+            msnp11_sdk::msnp_list::MsnpList::ForwardList,
         )
         .await
         .unwrap()
@@ -50,7 +50,7 @@ async fn add_contact() {
         assert_eq!(display_name, "Bob");
         assert_eq!(guid, "6bd736b8-dc18-44c6-ad61-8cd12d641e79");
         assert_eq!(groups.len(), 0);
-        assert_eq!(lists, vec![msnp11_sdk::list::List::ForwardList]);
+        assert_eq!(lists, vec![msnp11_sdk::msnp_list::MsnpList::ForwardList]);
     }
 
     if let msnp11_sdk::event::Event::Contact {
@@ -61,14 +61,14 @@ async fn add_contact() {
         .add_contact(
             &"fred@passport.com".to_string(),
             &"Fred".to_string(),
-            msnp11_sdk::list::List::AllowList,
+            msnp11_sdk::msnp_list::MsnpList::AllowList,
         )
         .await
         .unwrap()
     {
         assert_eq!(email, "fred@passport.com");
         assert_eq!(display_name, "Fred");
-        assert_eq!(lists, vec![msnp11_sdk::list::List::AllowList]);
+        assert_eq!(lists, vec![msnp11_sdk::msnp_list::MsnpList::AllowList]);
     }
 
     client.add_event_handler_closure(|event| match event {

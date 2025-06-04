@@ -1,4 +1,4 @@
-use crate::list::List;
+use crate::msnp_list::MsnpList;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::plain_text::PlainText;
 use crate::models::presence::Presence;
@@ -27,7 +27,7 @@ pub enum Event {
     Contact {
         email: String,
         display_name: String,
-        lists: Vec<List>,
+        lists: Vec<MsnpList>,
     },
 
     /// Contact in forward list.
@@ -35,7 +35,7 @@ pub enum Event {
         email: String,
         display_name: String,
         guid: String,
-        lists: Vec<List>,
+        lists: Vec<MsnpList>,
         groups: Vec<String>,
     },
 

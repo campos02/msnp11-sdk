@@ -50,7 +50,7 @@ pub mod client;
 pub mod event;
 pub mod event_handler;
 mod internal_event;
-pub mod list;
+pub mod msnp_list;
 pub mod models;
 mod notification_server;
 mod passport_auth;
@@ -62,7 +62,7 @@ uniffi::setup_scaffolding!();
 
 pub use client::Client;
 pub use event::Event;
-pub use list::List;
+pub use msnp_list::MsnpList;
 pub use models::personal_message::PersonalMessage;
 pub use models::plain_text::PlainText;
 pub use models::presence::Presence;

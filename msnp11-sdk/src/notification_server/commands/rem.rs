@@ -1,5 +1,5 @@
 use crate::internal_event::InternalEvent;
-use crate::list::List;
+use crate::msnp_list::MsnpList;
 use crate::sdk_error::SdkError;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -13,17 +13,17 @@ impl Rem {
         ns_tx: &mpsc::Sender<Vec<u8>>,
         internal_rx: &mut broadcast::Receiver<InternalEvent>,
         email: &String,
-        list: List,
+        list: MsnpList,
     ) -> Result<(), SdkError> {
         tr_id.fetch_add(1, Ordering::SeqCst);
         let tr_id = tr_id.load(Ordering::SeqCst);
 
         let list = match list {
-            List::ForwardList => return Err(SdkError::InvalidArgument.into()),
-            List::AllowList => "AL",
-            List::BlockList => "BL",
-            List::ReverseList => "RL",
-            List::PendingList => "PL",
+            MsnpList::ForwardList => return Err(SdkError::InvalidArgument.into()),
+            MsnpList::AllowList => "AL",
+            MsnpList::BlockList => "BL",
+            MsnpList::ReverseList => "RL",
+            MsnpList::PendingList => "PL",
         };
 
         let command = format!("REM {tr_id} {list} {email}\r\n");

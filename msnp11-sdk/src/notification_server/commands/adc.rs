@@ -1,6 +1,6 @@
 use crate::event::Event;
 use crate::internal_event::InternalEvent;
-use crate::list::List;
+use crate::msnp_list::MsnpList;
 use crate::sdk_error::SdkError;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -15,12 +15,12 @@ impl Adc {
         internal_rx: &mut broadcast::Receiver<InternalEvent>,
         email: &String,
         display_name: &String,
-        list: List,
+        list: MsnpList,
     ) -> Result<Event, SdkError> {
         tr_id.fetch_add(1, Ordering::SeqCst);
         let tr_id = tr_id.load(Ordering::SeqCst);
 
-        if list == List::ForwardList {
+        if list == MsnpList::ForwardList {
             let encoded_display_name = urlencoding::encode(display_name);
             let command = format!("ADC {tr_id} FL N={email} F={encoded_display_name}\r\n");
             ns_tx
@@ -31,11 +31,11 @@ impl Adc {
             trace!("C: {command}");
         } else {
             let list = match list {
-                List::ForwardList => "FL",
-                List::AllowList => "AL",
-                List::BlockList => "BL",
-                List::ReverseList => "RL",
-                List::PendingList => "PL",
+                MsnpList::ForwardList => "FL",
+                MsnpList::AllowList => "AL",
+                MsnpList::BlockList => "BL",
+                MsnpList::ReverseList => "RL",
+                MsnpList::PendingList => "PL",
             };
 
             let command = format!("ADC {tr_id} {list} N={email}\r\n");
@@ -55,7 +55,7 @@ impl Adc {
             let args: Vec<&str> = reply.trim().split(' ').collect();
             match args[0] {
                 "ADC" => match list {
-                    List::ForwardList => {
+                    MsnpList::ForwardList => {
                         if args[1] == tr_id.to_string()
                             && args[2] == "FL"
                             && args[3].replace("N=", "") == email.as_str()
@@ -64,7 +64,7 @@ impl Adc {
                                 email: email.to_owned(),
                                 display_name: display_name.to_owned(),
                                 guid: args[5].replace("C=", ""),
-                                lists: vec![List::ForwardList],
+                                lists: vec![MsnpList::ForwardList],
                                 groups: vec![],
                             });
                         }
@@ -72,11 +72,11 @@ impl Adc {
 
                     _ => {
                         let list_str = match list {
-                            List::ForwardList => "FL",
-                            List::AllowList => "AL",
-                            List::BlockList => "BL",
-                            List::ReverseList => "RL",
-                            List::PendingList => "PL",
+                            MsnpList::ForwardList => "FL",
+                            MsnpList::AllowList => "AL",
+                            MsnpList::BlockList => "BL",
+                            MsnpList::ReverseList => "RL",
+                            MsnpList::PendingList => "PL",
                         };
 
                         if args[1] == tr_id.to_string()
