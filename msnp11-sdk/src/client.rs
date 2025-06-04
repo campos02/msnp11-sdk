@@ -1,10 +1,10 @@
 use crate::event::Event;
 use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
-use crate::msnp_list::MsnpList;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
 use crate::models::user_data::UserData;
+use crate::msnp_list::MsnpList;
 use crate::notification_server::commands::adc::Adc;
 use crate::notification_server::commands::adg::Adg;
 use crate::notification_server::commands::blp::Blp;
@@ -50,6 +50,65 @@ pub struct Client {
 }
 
 impl Client {
+    /// Connects to the server, defines the channels and returns a new instance.
+    pub async fn new(server: String, port: String) -> Result<Self, SdkError> {
+        let server_ip = lookup_host(format!("{server}:{port}"))
+            .await
+            .or(Err(SdkError::ResolutionError))?
+            .next()
+            .ok_or(SdkError::ResolutionError)?
+            .ip()
+            .to_string();
+
+        let (event_tx, event_rx) = async_channel::bounded::<Event>(32);
+        let (ns_tx, mut ns_rx) = mpsc::channel::<Vec<u8>>(16);
+        let (internal_tx, _) = broadcast::channel::<InternalEvent>(32);
+
+        let socket = TcpStream::connect(format!("{server_ip}:{port}"))
+            .await
+            .or(Err(SdkError::CouldNotConnectToServer))?;
+
+        let (mut rd, mut wr) = socket.into_split();
+
+        let internal_task_tx = internal_tx.clone();
+        let event_task_tx = event_tx.clone();
+        tokio::spawn(async move {
+            while let Ok(base64_messages) = receive_split_into_base64(&mut rd).await {
+                for base64_message in base64_messages {
+                    let internal_event = into_internal_event(&base64_message);
+                    internal_task_tx
+                        .send(internal_event)
+                        .expect("Error sending internal event to channel");
+
+                    let event = into_event(&base64_message);
+                    if let Some(event) = event {
+                        event_task_tx
+                            .send(event)
+                            .await
+                            .expect("Error sending event to channel");
+                    }
+                }
+            }
+        });
+
+        tokio::spawn(async move {
+            while let Some(message) = ns_rx.recv().await {
+                wr.write_all(message.as_slice())
+                    .await
+                    .expect("Error sending message to socket");
+            }
+        });
+
+        Ok(Self {
+            event_tx,
+            event_rx,
+            ns_tx,
+            internal_tx,
+            tr_id: Arc::new(AtomicU32::new(0)),
+            user_data: Arc::new(Mutex::new(UserData::new())),
+        })
+    }
+
     fn start_pinging(&self) {
         let event_tx = self.event_tx.clone();
         let ns_tx = self.ns_tx.clone();
@@ -154,66 +213,6 @@ impl Client {
 
 #[uniffi::export]
 impl Client {
-    /// Connects to the server, defines the channels and returns a new instance.
-    #[uniffi::constructor]
-    pub async fn new(server: String, port: String) -> Result<Self, SdkError> {
-        let server_ip = lookup_host(format!("{server}:{port}"))
-            .await
-            .or(Err(SdkError::ResolutionError))?
-            .next()
-            .ok_or(SdkError::ResolutionError)?
-            .ip()
-            .to_string();
-
-        let (event_tx, event_rx) = async_channel::bounded::<Event>(32);
-        let (ns_tx, mut ns_rx) = mpsc::channel::<Vec<u8>>(16);
-        let (internal_tx, _) = broadcast::channel::<InternalEvent>(32);
-
-        let socket = TcpStream::connect(format!("{server_ip}:{port}"))
-            .await
-            .or(Err(SdkError::CouldNotConnectToServer))?;
-
-        let (mut rd, mut wr) = socket.into_split();
-
-        let internal_task_tx = internal_tx.clone();
-        let event_task_tx = event_tx.clone();
-        tokio::spawn(async move {
-            while let Ok(base64_messages) = receive_split_into_base64(&mut rd).await {
-                for base64_message in base64_messages {
-                    let internal_event = into_internal_event(&base64_message);
-                    internal_task_tx
-                        .send(internal_event)
-                        .expect("Error sending internal event to channel");
-
-                    let event = into_event(&base64_message);
-                    if let Some(event) = event {
-                        event_task_tx
-                            .send(event)
-                            .await
-                            .expect("Error sending event to channel");
-                    }
-                }
-            }
-        });
-
-        tokio::spawn(async move {
-            while let Some(message) = ns_rx.recv().await {
-                wr.write_all(message.as_slice())
-                    .await
-                    .expect("Error sending message to socket");
-            }
-        });
-
-        Ok(Self {
-            event_tx,
-            event_rx,
-            ns_tx,
-            internal_tx,
-            tr_id: Arc::new(AtomicU32::new(0)),
-            user_data: Arc::new(Mutex::new(UserData::new())),
-        })
-    }
-
     /// Adds a new handler that implements the [EventHandler] trait.
     ///
     /// This exists for the foreign language bindings, with which generics don't

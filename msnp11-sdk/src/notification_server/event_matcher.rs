@@ -1,8 +1,8 @@
 use crate::event::Event;
 use crate::internal_event::InternalEvent;
-use crate::msnp_list::MsnpList;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
+use crate::msnp_list::MsnpList;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 

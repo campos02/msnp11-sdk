@@ -46,12 +46,13 @@
 //! [UniFFI](https://mozilla.github.io/uniffi-rs/latest/tutorial/foreign_language_bindings.html#multi-crate-workspaces).
 //!
 
+pub mod build_client;
 pub mod client;
 pub mod event;
 pub mod event_handler;
 mod internal_event;
-pub mod msnp_list;
 pub mod models;
+pub mod msnp_list;
 mod notification_server;
 mod passport_auth;
 mod receive_split_into_base64;
@@ -62,8 +63,8 @@ uniffi::setup_scaffolding!();
 
 pub use client::Client;
 pub use event::Event;
-pub use msnp_list::MsnpList;
 pub use models::personal_message::PersonalMessage;
 pub use models::plain_text::PlainText;
 pub use models::presence::Presence;
+pub use msnp_list::MsnpList;
 pub use switchboard::switchboard::Switchboard;
