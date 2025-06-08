@@ -22,22 +22,31 @@ pub fn into_event(base64_message: &String) -> Option<Event> {
     let args: Vec<&str> = command.trim().split(' ').collect();
     match args[0] {
         "GTC" => {
-            let gtc = if args.len() > 2 { args[2] } else { args[1] };
-            Some(Event::Gtc(gtc.to_string()))
+            if args.len() < 3 {
+                Some(Event::Gtc(args[1].to_string()))
+            } else {
+                None
+            }
         }
 
         "BLP" => {
-            let blp = if args.len() > 2 { args[2] } else { args[1] };
-            Some(Event::Blp(blp.to_string()))
+            if args.len() < 3 {
+                Some(Event::Blp(args[1].to_string()))
+            } else {
+                None
+            }
         }
 
         "PRP" => {
-            let display_name = if args.len() > 2 { args[2] } else { args[1] };
-            Some(Event::DisplayName(
-                urlencoding::decode(display_name)
-                    .expect("Could not url decode display name")
-                    .to_string(),
-            ))
+            if args.len() < 4 && args[1] == "MFN" {
+                Some(Event::DisplayName(
+                    urlencoding::decode(args[2])
+                        .expect("Could not url decode display name")
+                        .to_string(),
+                ))
+            } else {
+                None
+            }
         }
 
         "LSG" => Some(Event::Group {

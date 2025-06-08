@@ -23,6 +23,10 @@ pub fn into_event(base64_message: &String) -> Option<Event> {
     let args: Vec<&str> = command.trim().split(' ').collect();
     match args[0] {
         "MSG" => {
+            if !args[1].contains("@") {
+                return None;
+            }
+
             let payload = reply.replace(command.as_str(), "");
             let Some(content_type) = payload.lines().nth(1) else {
                 return None;
