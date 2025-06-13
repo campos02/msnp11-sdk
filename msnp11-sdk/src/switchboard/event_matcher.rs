@@ -119,7 +119,7 @@ pub fn into_internal_event(base64_message: &String) -> InternalEvent {
                 if binary_header.flag == 0x20 {
                     return InternalEvent::P2PData {
                         destination,
-                        message: message_bytes,
+                        message: message_bytes[..(message_bytes.len() - 4)].to_vec(),
                     };
                 }
 

@@ -25,23 +25,26 @@ impl Prp {
 
         trace!("C: {command}");
 
-        while let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
-        {
-            trace!("S: {reply}");
+        loop {
+            if let InternalEvent::ServerReply(reply) =
+                internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+            {
+                trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
-            match args[0] {
-                "PRP" => {
-                    if args[1] == tr_id.to_string() && args[2] == "MFN" && args[3] == display_name {
-                        return Ok(());
+                let args: Vec<&str> = reply.trim().split(' ').collect();
+                match args[0] {
+                    "PRP" => {
+                        if args[1] == tr_id.to_string()
+                            && args[2] == "MFN"
+                            && args[3] == display_name
+                        {
+                            return Ok(());
+                        }
                     }
-                }
 
-                _ => (),
+                    _ => (),
+                }
             }
         }
-
-        Err(SdkError::Disconnected.into())
     }
 }

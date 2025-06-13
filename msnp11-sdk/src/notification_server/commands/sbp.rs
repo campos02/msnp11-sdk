@@ -26,45 +26,45 @@ impl Sbp {
 
         trace!("C: {command}");
 
-        while let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
-        {
-            trace!("S: {reply}");
+        loop {
+            if let InternalEvent::ServerReply(reply) =
+                internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+            {
+                trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
-            match args[0] {
-                "SBP" => {
-                    if args[1] == tr_id.to_string()
-                        && args[2] == guid
-                        && args[3] == "MFN"
-                        && args[4] == display_name
-                    {
-                        return Ok(());
+                let args: Vec<&str> = reply.trim().split(' ').collect();
+                match args[0] {
+                    "SBP" => {
+                        if args[1] == tr_id.to_string()
+                            && args[2] == guid
+                            && args[3] == "MFN"
+                            && args[4] == display_name
+                        {
+                            return Ok(());
+                        }
                     }
-                }
 
-                "201" => {
-                    if args[1] == tr_id.to_string() {
-                        return Err(SdkError::InvalidArgument.into());
+                    "201" => {
+                        if args[1] == tr_id.to_string() {
+                            return Err(SdkError::InvalidArgument.into());
+                        }
                     }
-                }
 
-                "208" => {
-                    if args[1] == tr_id.to_string() {
-                        return Err(SdkError::InvalidContact.into());
+                    "208" => {
+                        if args[1] == tr_id.to_string() {
+                            return Err(SdkError::InvalidContact.into());
+                        }
                     }
-                }
 
-                "603" => {
-                    if args[1] == tr_id.to_string() {
-                        return Err(SdkError::ServerError.into());
+                    "603" => {
+                        if args[1] == tr_id.to_string() {
+                            return Err(SdkError::ServerError.into());
+                        }
                     }
-                }
 
-                _ => (),
+                    _ => (),
+                }
             }
         }
-
-        Err(SdkError::Disconnected.into())
     }
 }

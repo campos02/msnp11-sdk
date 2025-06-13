@@ -25,29 +25,29 @@ impl Usr {
 
         trace!("C: {command}");
 
-        while let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
-        {
-            trace!("S: {reply}");
+        loop {
+            if let InternalEvent::ServerReply(reply) =
+                internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+            {
+                trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
-            match args[0] {
-                "USR" => {
-                    if args[1] == tr_id.to_string() && args[2] == "OK" {
-                        return Ok(());
+                let args: Vec<&str> = reply.trim().split(' ').collect();
+                match args[0] {
+                    "USR" => {
+                        if args[1] == tr_id.to_string() && args[2] == "OK" {
+                            return Ok(());
+                        }
                     }
-                }
 
-                "911" => {
-                    if args[1] == tr_id.to_string() {
-                        return Err(SdkError::ServerIsBusy);
+                    "911" => {
+                        if args[1] == tr_id.to_string() {
+                            return Err(SdkError::ServerIsBusy);
+                        }
                     }
-                }
 
-                _ => (),
+                    _ => (),
+                }
             }
         }
-
-        Err(SdkError::Disconnected)
     }
 }

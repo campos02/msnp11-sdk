@@ -67,7 +67,13 @@ impl DisplayPictureSession {
         let mut body = format!("EUF-GUID: {{A4268EEC-FEC5-49E5-95C3-F126696BDBF6}}\r\n");
         body.push_str(format!("SessionID: {session_id}\r\n").as_str());
         body.push_str("AppID: 1\r\n");
-        body.push_str(format!("Context: {}\r\n\r\n\0", STANDARD.encode(msn_object)).as_str());
+        body.push_str(
+            format!(
+                "Context: {}\r\n\r\n\0",
+                STANDARD.encode((msn_object.to_owned() + "\0").as_bytes())
+            )
+            .as_str(),
+        );
 
         let mut headers = format!("INVITE MSNMSGR:{to} MSNSLP/1.0\r\n");
         headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());
@@ -77,7 +83,7 @@ impl DisplayPictureSession {
         headers.push_str(format!("Call-ID: {{{call_id}}}\r\n").as_str());
         headers.push_str("Max-Forwards: 0\r\n");
         headers.push_str("Content-Type: application/x-msnmsgr-sessionreqbody\r\n");
-        headers.push_str(format!("Content-Length: {}\r\n", body.len()).as_str());
+        headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
         let message = format!("{headers}{body}");
         let mut invite = BinaryHeader {
@@ -108,6 +114,7 @@ impl DisplayPictureSession {
 
         let (_, binary_header) = BinaryHeader::from_reader((&mut cursor, 0))
             .or(Err(SdkError::BinaryHeaderReadingError))?;
+
         let mut ack_header = BinaryHeader {
             session_id: binary_header.session_id,
             identifier: !binary_header.identifier,
@@ -138,7 +145,7 @@ impl DisplayPictureSession {
         headers.push_str(format!("Call-ID: {{{}}}\r\n", self.call_id).as_str());
         headers.push_str("Max-Forwards: 0\r\n");
         headers.push_str("Content-Type: application/x-msnmsgr-sessionreqbody\r\n");
-        headers.push_str(format!("Content-Length: {}\r\n", body.len()).as_str());
+        headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
         let message = format!("{headers}{body}");
         let mut ok = BinaryHeader {
@@ -220,7 +227,7 @@ impl DisplayPictureSession {
         headers.push_str(format!("Call-ID: {{{}}}\r\n", self.call_id).as_str());
         headers.push_str("Max-Forwards: 0\r\n");
         headers.push_str("Content-Type: application/x-msnmsgr-sessionreqbody\r\n");
-        headers.push_str(format!("Content-Length: {}\r\n", body.len()).as_str());
+        headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
         let message = format!("{headers}{body}");
         let mut bye = BinaryHeader {

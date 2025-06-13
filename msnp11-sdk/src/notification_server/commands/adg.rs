@@ -25,35 +25,35 @@ impl Adg {
 
         trace!("C: {command}");
 
-        while let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
-        {
-            trace!("S: {reply}");
+        loop {
+            if let InternalEvent::ServerReply(reply) =
+                internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+            {
+                trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
-            match args[0] {
-                "ADG" => {
-                    if args[1] == tr_id.to_string() && args[3] == group_name {
-                        return Ok(());
+                let args: Vec<&str> = reply.trim().split(' ').collect();
+                match args[0] {
+                    "ADG" => {
+                        if args[1] == tr_id.to_string() && args[3] == group_name {
+                            return Ok(());
+                        }
                     }
-                }
 
-                "228" => {
-                    if args[1] == tr_id.to_string() {
-                        return Err(SdkError::InvalidArgument.into());
+                    "228" => {
+                        if args[1] == tr_id.to_string() {
+                            return Err(SdkError::InvalidArgument.into());
+                        }
                     }
-                }
 
-                "603" => {
-                    if args[1] == tr_id.to_string() {
-                        return Err(SdkError::ServerError.into());
+                    "603" => {
+                        if args[1] == tr_id.to_string() {
+                            return Err(SdkError::ServerError.into());
+                        }
                     }
-                }
 
-                _ => (),
+                    _ => (),
+                }
             }
         }
-
-        Err(SdkError::Disconnected.into())
     }
 }

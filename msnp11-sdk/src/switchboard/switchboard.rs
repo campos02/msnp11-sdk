@@ -20,6 +20,7 @@ use std::error::Error;
 use std::io::Cursor;
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Mutex, RwLock};
+use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc};
@@ -99,6 +100,7 @@ impl Switchboard {
     async fn handle_p2p_events(&self) -> Result<(), SdkError> {
         let sb_tx = self.sb_tx.clone();
         let mut internal_rx = self.internal_tx.subscribe();
+        let mut command_internal_rx = self.internal_tx.subscribe();
         let tr_id = self.tr_id.clone();
         let user_data_arc = self.user_data.clone();
         let user_email;
@@ -154,21 +156,6 @@ impl Switchboard {
                         };
 
                         let from = from.replace("From: <msnmsgr:", "").replace(">", "");
-                        let Some(context) =
-                            invite_parameters.find(|line| line.contains("Context: "))
-                        else {
-                            continue;
-                        };
-
-                        let context = context.replace("Context: ", "");
-                        let Some(msn_object) = user_data.msn_object.as_ref() else {
-                            continue;
-                        };
-
-                        if context != STANDARD.encode(msn_object) {
-                            continue;
-                        }
-
                         let Ok(session) = DisplayPictureSession::new_from_invite(&invite) else {
                             continue;
                         };
@@ -180,13 +167,28 @@ impl Switchboard {
                         if Msg::send_p2p(
                             &tr_id,
                             &sb_tx,
-                            &mut internal_rx,
+                            &mut command_internal_rx,
                             ack_payload,
                             from.as_str(),
                         )
                         .await
                         .is_err()
                         {
+                            continue;
+                        }
+
+                        let Some(context) =
+                            invite_parameters.find(|line| line.contains("Context: "))
+                        else {
+                            continue;
+                        };
+
+                        let context = context.replace("Context: ", "");
+                        let Some(msn_object) = user_data.msn_object.as_ref() else {
+                            continue;
+                        };
+
+                        if context != STANDARD.encode((msn_object.to_owned() + "\0").as_bytes()) {
                             continue;
                         }
 
@@ -197,7 +199,7 @@ impl Switchboard {
                         if Msg::send_p2p(
                             &tr_id,
                             &sb_tx,
-                            &mut internal_rx,
+                            &mut command_internal_rx,
                             ok_payload,
                             from.as_str(),
                         )
@@ -214,7 +216,7 @@ impl Switchboard {
                         if Msg::send_p2p(
                             &tr_id,
                             &sb_tx,
-                            &mut internal_rx,
+                            &mut command_internal_rx,
                             preparation_payload,
                             from.as_str(),
                         )
@@ -236,7 +238,7 @@ impl Switchboard {
                             if Msg::send_p2p(
                                 &tr_id,
                                 &sb_tx,
-                                &mut internal_rx,
+                                &mut command_internal_rx,
                                 data_payload,
                                 from.as_str(),
                             )
@@ -268,7 +270,6 @@ impl Switchboard {
                         };
 
                         let from = from.replace("From: <msnmsgr:", "").replace(">", "");
-
                         let Ok(ack_payload) = DisplayPictureSession::acknowledge(bye) else {
                             continue;
                         };
@@ -276,7 +277,7 @@ impl Switchboard {
                         if Msg::send_p2p(
                             &tr_id,
                             &sb_tx,
-                            &mut internal_rx,
+                            &mut command_internal_rx,
                             ack_payload,
                             from.as_str(),
                         )
@@ -425,70 +426,104 @@ impl Switchboard {
         }
 
         let mut internal_rx = self.internal_tx.subscribe();
+        let mut command_internal_rx = self.internal_tx.subscribe();
         let mut session = DisplayPictureSession::new();
         let invite = session.invite(email, &user_email, msn_object)?;
 
-        Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, invite, email).await?;
-
-        while let Ok(event) = internal_rx.recv().await {
-            if let InternalEvent::P2POk {
-                destination,
-                message: ok,
-            } = event
-            {
-                if destination != *user_email {
-                    continue;
-                }
-
-                let ack = DisplayPictureSession::acknowledge(ok)?;
-                Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
-                break;
-            }
-        }
-
-        while let Ok(event) = internal_rx.recv().await {
-            if let InternalEvent::P2PDataPreparation {
-                destination,
-                message: data_preparation,
-            } = event
-            {
-                if destination != *user_email {
-                    continue;
-                }
-
-                let ack = DisplayPictureSession::acknowledge(data_preparation)?;
-                Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
-                break;
-            }
-        }
+        Msg::send_p2p(
+            &self.tr_id,
+            &self.sb_tx,
+            &mut command_internal_rx,
+            invite,
+            email,
+        )
+        .await?;
 
         let mut picture: Vec<u8> = Vec::new();
-        while let Ok(event) = internal_rx.recv().await {
-            if let InternalEvent::P2PData {
-                destination,
-                message: data,
-            } = event
-            {
-                if destination != *user_email {
-                    continue;
+        loop {
+            match internal_rx.recv().await.or(Err(SdkError::ReceivingError))? {
+                InternalEvent::P2POk {
+                    destination,
+                    message,
+                } => {
+                    if destination != *user_email {
+                        continue;
+                    }
+
+                    let ack = DisplayPictureSession::acknowledge(message)?;
+                    Msg::send_p2p(
+                        &self.tr_id,
+                        &self.sb_tx,
+                        &mut command_internal_rx,
+                        ack,
+                        email,
+                    )
+                    .await?;
                 }
 
-                let binary_header = data[..48].to_vec();
-                let mut cursor = Cursor::new(binary_header);
-                let (_, binary_header) = BinaryHeader::from_reader((&mut cursor, 0))
-                    .or(Err(SdkError::BinaryHeaderReadingError))?;
+                InternalEvent::P2PDataPreparation {
+                    destination,
+                    message,
+                } => {
+                    if destination != *user_email {
+                        continue;
+                    }
 
-                picture.extend_from_slice(&data[..(data.len() - 4)]);
-                if picture.len() >= binary_header.total_data_size as usize {
-                    let ack = DisplayPictureSession::acknowledge(data)?;
-                    Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
-                    break;
+                    let ack = DisplayPictureSession::acknowledge(message)?;
+                    Msg::send_p2p(
+                        &self.tr_id,
+                        &self.sb_tx,
+                        &mut command_internal_rx,
+                        ack,
+                        email,
+                    )
+                    .await?;
                 }
+
+                InternalEvent::P2PData {
+                    destination,
+                    message: data,
+                } => {
+                    if destination != *user_email {
+                        continue;
+                    }
+
+                    let binary_header = data[..48].to_vec();
+                    let mut cursor = Cursor::new(binary_header);
+                    let (_, binary_header) = BinaryHeader::from_reader((&mut cursor, 0))
+                        .or(Err(SdkError::BinaryHeaderReadingError))?;
+
+                    picture.extend_from_slice(&data[48..]);
+                    if picture.len() == binary_header.total_data_size as usize {
+                        let ack = DisplayPictureSession::acknowledge(data)?;
+                        Msg::send_p2p(
+                            &self.tr_id,
+                            &self.sb_tx,
+                            &mut command_internal_rx,
+                            ack,
+                            email,
+                        )
+                        .await?;
+                        break;
+                    }
+                }
+
+                _ => (),
             }
+
+            // Introduce some delay so all chunks are received
+            tokio::time::sleep(Duration::from_millis(150)).await;
         }
 
         let bye = session.bye(email, &user_email)?;
-        Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, bye, email).await?;
+        Msg::send_p2p(
+            &self.tr_id,
+            &self.sb_tx,
+            &mut command_internal_rx,
+            bye,
+            email,
+        )
+        .await?;
 
         self.event_tx
             .send(Event::DisplayPicture {

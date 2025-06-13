@@ -36,29 +36,29 @@ impl Chg {
 
         trace!("C: {command}");
 
-        while let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
-        {
-            trace!("S: {reply}");
+        loop {
+            if let InternalEvent::ServerReply(reply) =
+                internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+            {
+                trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
-            match args[0] {
-                "CHG" => {
-                    if args[1] == tr_id.to_string() {
-                        return Ok(());
+                let args: Vec<&str> = reply.trim().split(' ').collect();
+                match args[0] {
+                    "CHG" => {
+                        if args[1] == tr_id.to_string() {
+                            return Ok(());
+                        }
                     }
-                }
 
-                "201" => {
-                    if args[1] == tr_id.to_string() {
-                        return Err(SdkError::InvalidArgument.into());
+                    "201" => {
+                        if args[1] == tr_id.to_string() {
+                            return Err(SdkError::InvalidArgument.into());
+                        }
                     }
-                }
 
-                _ => (),
+                    _ => (),
+                }
             }
         }
-
-        Err(SdkError::Disconnected.into())
     }
 }

@@ -24,39 +24,39 @@ impl UsrI {
 
         trace!("C: {command}");
 
-        while let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
-        {
-            trace!("S: {reply}");
+        loop {
+            if let InternalEvent::ServerReply(reply) =
+                internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+            {
+                trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
-            match args[0] {
-                "USR" => {
-                    if args[1] == tr_id.to_string() && args[2] == "TWN" && args[3] == "S" {
-                        return Ok(InternalEvent::GotAuthorizationString(args[4].to_string()));
+                let args: Vec<&str> = reply.trim().split(' ').collect();
+                match args[0] {
+                    "USR" => {
+                        if args[1] == tr_id.to_string() && args[2] == "TWN" && args[3] == "S" {
+                            return Ok(InternalEvent::GotAuthorizationString(args[4].to_string()));
+                        }
                     }
-                }
 
-                "XFR" => {
-                    if args[1] == tr_id.to_string() && args[2] == "NS" {
-                        let server_and_port: Vec<&str> = args[3].trim().split(':').collect();
-                        return Ok(InternalEvent::RedirectedTo {
-                            server: server_and_port[0].to_string(),
-                            port: server_and_port[1].to_string(),
-                        });
+                    "XFR" => {
+                        if args[1] == tr_id.to_string() && args[2] == "NS" {
+                            let server_and_port: Vec<&str> = args[3].trim().split(':').collect();
+                            return Ok(InternalEvent::RedirectedTo {
+                                server: server_and_port[0].to_string(),
+                                port: server_and_port[1].to_string(),
+                            });
+                        }
                     }
-                }
 
-                "911" => {
-                    if args[1] == tr_id.to_string() {
-                        return Err(SdkError::ServerIsBusy.into());
+                    "911" => {
+                        if args[1] == tr_id.to_string() {
+                            return Err(SdkError::ServerIsBusy.into());
+                        }
                     }
-                }
 
-                _ => (),
+                    _ => (),
+                }
             }
         }
-
-        Err(SdkError::Disconnected.into())
     }
 }
