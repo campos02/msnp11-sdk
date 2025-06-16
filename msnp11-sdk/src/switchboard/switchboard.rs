@@ -48,7 +48,7 @@ impl Switchboard {
     ) -> Result<Self, SdkError> {
         let (event_tx, event_rx) = async_channel::bounded::<Event>(32);
         let (sb_tx, mut sb_rx) = mpsc::channel::<Vec<u8>>(16);
-        let (internal_tx, _) = broadcast::channel::<InternalEvent>(32);
+        let (internal_tx, _) = broadcast::channel::<InternalEvent>(128);
 
         let socket = TcpStream::connect(format!("{server}:{port}"))
             .await

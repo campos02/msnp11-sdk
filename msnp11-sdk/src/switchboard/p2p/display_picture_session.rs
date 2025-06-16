@@ -191,7 +191,7 @@ impl DisplayPictureSession {
         let total_data_size = data.len() as u64;
         let mut data_offset = 0u64;
 
-        let mut chunks = data.chunks(1190);
+        let mut chunks = data.chunks(1202);
         while let Some(chunk) = chunks.next() {
             let mut data_message = BinaryHeader {
                 session_id: self.session_id,

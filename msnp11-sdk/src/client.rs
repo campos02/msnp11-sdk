@@ -61,7 +61,7 @@ impl Client {
 
         let (event_tx, event_rx) = async_channel::bounded::<Event>(32);
         let (ns_tx, mut ns_rx) = mpsc::channel::<Vec<u8>>(16);
-        let (internal_tx, _) = broadcast::channel::<InternalEvent>(32);
+        let (internal_tx, _) = broadcast::channel::<InternalEvent>(64);
 
         let socket = TcpStream::connect(format!("{server_ip}:{port}"))
             .await
