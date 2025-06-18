@@ -186,7 +186,7 @@ impl DisplayPictureSession {
         Ok(data_preparation)
     }
 
-    pub fn data(&self, data: Vec<u8>) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
+    pub fn data(&self, data: &Vec<u8>) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
         let mut payloads: Vec<Vec<u8>> = Vec::new();
         let total_data_size = data.len() as u64;
         let mut data_offset = 0u64;

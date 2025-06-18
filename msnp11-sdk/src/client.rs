@@ -144,7 +144,6 @@ impl Client {
     async fn handle_switchboard_invitations(&self) -> Result<(), SdkError> {
         let event_tx = self.event_tx.clone();
         let mut internal_rx = self.internal_tx.subscribe();
-
         let user_data = self.user_data.clone();
         let user_email;
         {
@@ -481,8 +480,9 @@ impl Client {
         Ok(switchboard)
     }
 
-    /// Sets the user's display picture. This method uses the picture's binary data, and scaling down to a size like 96x96 is recommended.
-    pub fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<(), SdkError> {
+    /// Sets the user's display picture, returning a standard base64 encoded hash of the picture.
+    /// This method uses the picture's binary data, and scaling down to a size like 200x200 is recommended.
+    pub fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<String, SdkError> {
         let mut user_data = self
             .user_data
             .write()
@@ -509,7 +509,7 @@ impl Client {
         ));
 
         user_data.display_picture = Some(display_picture);
-        Ok(())
+        Ok(sha1d)
     }
 
     /// Disconnects from the server.

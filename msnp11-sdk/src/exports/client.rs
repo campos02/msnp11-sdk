@@ -153,7 +153,7 @@ impl Client {
     }
 
     /// Sets the user's display picture. This method uses the picture's binary data, and scaling down to a size like 96x96 is recommended.
-    pub fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<(), SdkError> {
+    pub fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<String, SdkError> {
         self.inner.set_display_picture(display_picture)
     }
 

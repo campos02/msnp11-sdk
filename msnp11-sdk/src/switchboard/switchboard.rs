@@ -102,19 +102,14 @@ impl Switchboard {
         let mut internal_rx = self.internal_tx.subscribe();
         let mut command_internal_rx = self.internal_tx.subscribe();
         let tr_id = self.tr_id.clone();
-        let user_data_arc = self.user_data.clone();
-        let user_email;
+        let user_data;
         {
-            let user_data = self
+            let user_data_lock = self
                 .user_data
                 .read()
                 .or(Err(SdkError::CouldNotGetUserData))?;
 
-            user_email = user_data
-                .email
-                .as_ref()
-                .ok_or(SdkError::NotLoggedIn)?
-                .clone();
+            user_data = user_data_lock.clone();
         }
 
         tokio::spawn(async move {
@@ -124,14 +119,9 @@ impl Switchboard {
                         destination,
                         message: invite,
                     } => {
-                        let user_data;
-                        {
-                            let Ok(user_data_lock) = user_data_arc.read() else {
-                                continue;
-                            };
-
-                            user_data = user_data_lock.clone();
-                        }
+                        let Some(ref user_email) = user_data.email else {
+                            continue;
+                        };
 
                         if destination != *user_email {
                             continue;
@@ -226,7 +216,7 @@ impl Switchboard {
                             continue;
                         }
 
-                        let Some(display_picture) = user_data.display_picture.clone() else {
+                        let Some(display_picture) = user_data.display_picture.as_ref() else {
                             continue;
                         };
 
@@ -254,6 +244,10 @@ impl Switchboard {
                         destination,
                         message: bye,
                     } => {
+                        let Some(ref user_email) = user_data.email else {
+                            continue;
+                        };
+
                         if destination != *user_email {
                             continue;
                         }
