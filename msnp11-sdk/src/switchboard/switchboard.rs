@@ -19,7 +19,7 @@ use log::trace;
 use std::error::Error;
 use std::io::Cursor;
 use std::sync::atomic::AtomicU32;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
@@ -36,7 +36,7 @@ pub struct Switchboard {
     tr_id: Arc<AtomicU32>,
     session_id: Arc<RwLock<Option<String>>>,
     cki_string: String,
-    user_data: Arc<Mutex<UserData>>,
+    user_data: Arc<RwLock<UserData>>,
 }
 
 impl Switchboard {
@@ -44,7 +44,7 @@ impl Switchboard {
         server: &str,
         port: &str,
         cki_string: &str,
-        user_data: Arc<Mutex<UserData>>,
+        user_data: Arc<RwLock<UserData>>,
     ) -> Result<Self, SdkError> {
         let (event_tx, event_rx) = async_channel::bounded::<Event>(32);
         let (sb_tx, mut sb_rx) = mpsc::channel::<Vec<u8>>(16);
@@ -107,7 +107,7 @@ impl Switchboard {
         {
             let user_data = self
                 .user_data
-                .lock()
+                .read()
                 .or(Err(SdkError::CouldNotGetUserData))?;
 
             user_email = user_data
@@ -126,7 +126,7 @@ impl Switchboard {
                     } => {
                         let user_data;
                         {
-                            let Ok(user_data_lock) = user_data_arc.lock() else {
+                            let Ok(user_data_lock) = user_data_arc.read() else {
                                 continue;
                             };
 
@@ -415,7 +415,7 @@ impl Switchboard {
         {
             let user_data = self
                 .user_data
-                .lock()
+                .read()
                 .or(Err(SdkError::CouldNotGetUserData))?;
 
             user_email = user_data

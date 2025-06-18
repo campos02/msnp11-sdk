@@ -4,7 +4,7 @@ use crate::sdk_error::SdkError;
 use crate::switchboard::switchboard::Switchboard;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use tokio::sync::{broadcast, mpsc};
 
 pub struct Xfr;
@@ -14,7 +14,7 @@ impl Xfr {
         tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
         internal_rx: &mut broadcast::Receiver<InternalEvent>,
-        user_data: Arc<Mutex<UserData>>,
+        user_data: Arc<RwLock<UserData>>,
     ) -> Result<Switchboard, SdkError> {
         tr_id.fetch_add(1, Ordering::SeqCst);
         let tr_id = tr_id.load(Ordering::SeqCst);

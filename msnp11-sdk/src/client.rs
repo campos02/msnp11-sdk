@@ -32,7 +32,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use log::trace;
 use std::sync::atomic::AtomicU32;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpStream, lookup_host};
@@ -45,7 +45,7 @@ pub struct Client {
     ns_tx: mpsc::Sender<Vec<u8>>,
     internal_tx: broadcast::Sender<InternalEvent>,
     tr_id: Arc<AtomicU32>,
-    user_data: Arc<Mutex<UserData>>,
+    user_data: Arc<RwLock<UserData>>,
 }
 
 impl Client {
@@ -104,7 +104,7 @@ impl Client {
             ns_tx,
             internal_tx,
             tr_id: Arc::new(AtomicU32::new(0)),
-            user_data: Arc::new(Mutex::new(UserData::new())),
+            user_data: Arc::new(RwLock::new(UserData::new())),
         })
     }
 
@@ -150,7 +150,7 @@ impl Client {
         {
             let user_data = self
                 .user_data
-                .lock()
+                .read()
                 .or(Err(SdkError::CouldNotGetUserData))?;
 
             user_email = user_data
@@ -259,7 +259,7 @@ impl Client {
         {
             let mut user_data = self
                 .user_data
-                .lock()
+                .write()
                 .or(Err(SdkError::CouldNotSetUserData))?;
 
             user_data.email = Some(email);
@@ -280,7 +280,7 @@ impl Client {
         {
             let user_data = self
                 .user_data
-                .lock()
+                .read()
                 .or(Err(SdkError::CouldNotSetUserData))?;
 
             msn_object = user_data.msn_object.clone();
@@ -458,7 +458,7 @@ impl Client {
         {
             let user_data = self
                 .user_data
-                .lock()
+                .read()
                 .or(Err(SdkError::CouldNotGetUserData))?;
 
             user_email = user_data
@@ -485,7 +485,7 @@ impl Client {
     pub fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<(), SdkError> {
         let mut user_data = self
             .user_data
-            .lock()
+            .write()
             .or(Err(SdkError::CouldNotSetUserData))?;
 
         let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
