@@ -2,17 +2,12 @@ use crate::event::Event;
 use crate::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
 use crate::switchboard::p2p::binary_header::BinaryHeader;
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::DekuContainerRead;
 use std::io::Cursor;
 
-pub fn into_event(base64_message: &String) -> Option<Event> {
-    let message_bytes = STANDARD
-        .decode(base64_message)
-        .expect("Could not decode socket message from base64");
-
-    let reply = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) };
+pub fn into_event(message: &Vec<u8>) -> Option<Event> {
+    let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) };
     let command = reply
         .lines()
         .next()
@@ -77,12 +72,8 @@ pub fn into_event(base64_message: &String) -> Option<Event> {
     }
 }
 
-pub fn into_internal_event(base64_message: &String) -> InternalEvent {
-    let message_bytes = STANDARD
-        .decode(base64_message)
-        .expect("Could not decode socket message from base64");
-
-    let reply = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) }.to_string();
+pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
+    let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) }.to_string();
     let command = reply
         .lines()
         .next()
@@ -106,11 +97,10 @@ pub fn into_internal_event(base64_message: &String) -> InternalEvent {
 
                 let destination = destination.replace("P2P-Dest: ", "");
                 let msg_headers = payload.split("\r\n\r\n").collect::<Vec<&str>>()[0];
-                let message_bytes = message_bytes
-                    [(command.len() + msg_headers.len() + "\r\n\r\n".len())..]
-                    .to_vec();
+                let message =
+                    message[(command.len() + msg_headers.len() + "\r\n\r\n".len())..].to_vec();
 
-                let binary_header = &message_bytes[..48];
+                let binary_header = &message[..48];
                 let mut cursor = Cursor::new(binary_header);
                 let Ok((_, binary_header)) = BinaryHeader::from_reader((&mut cursor, 0)) else {
                     return InternalEvent::ServerReply(reply);
@@ -119,35 +109,35 @@ pub fn into_internal_event(base64_message: &String) -> InternalEvent {
                 if binary_header.flag == 0x20 {
                     return InternalEvent::P2PData {
                         destination,
-                        message: message_bytes[..(message_bytes.len() - 4)].to_vec(),
+                        message: message[..(message.len() - 4)].to_vec(),
                     };
                 }
 
-                if binary_header.total_data_size == 4 && message_bytes[48..52].eq(&[0; 4]) {
+                if binary_header.total_data_size == 4 && message[48..52].eq(&[0; 4]) {
                     return InternalEvent::P2PDataPreparation {
                         destination,
-                        message: message_bytes,
+                        message,
                     };
                 }
 
                 if payload.contains("INVITE") {
                     return InternalEvent::P2PInvite {
                         destination,
-                        message: message_bytes,
+                        message,
                     };
                 }
 
                 if payload.contains("200 OK") {
                     return InternalEvent::P2POk {
                         destination,
-                        message: message_bytes,
+                        message,
                     };
                 }
 
                 if payload.contains("BYE") {
                     return InternalEvent::P2PBye {
                         destination,
-                        message: message_bytes,
+                        message,
                     };
                 }
             }

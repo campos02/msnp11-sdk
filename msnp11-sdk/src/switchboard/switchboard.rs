@@ -3,7 +3,7 @@ use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
 use crate::models::user_data::UserData;
-use crate::receive_split_into_base64::receive_split_into_base64;
+use crate::receive_split::receive_split;
 use crate::sdk_error::SdkError;
 use crate::switchboard::commands::ans::Ans;
 use crate::switchboard::commands::cal::Cal;
@@ -59,14 +59,14 @@ impl Switchboard {
         let internal_task_tx = internal_tx.clone();
         let event_task_tx = event_tx.clone();
         tokio::spawn(async move {
-            while let Ok(base64_messages) = receive_split_into_base64(&mut rd).await {
-                for base64_message in base64_messages {
-                    let internal_event = into_internal_event(&base64_message);
+            while let Ok(messages) = receive_split(&mut rd).await {
+                for message in messages {
+                    let internal_event = into_internal_event(&message);
                     internal_task_tx
                         .send(internal_event)
                         .expect("Error sending internal event to channel");
 
-                    let event = into_event(&base64_message);
+                    let event = into_event(&message);
                     if let Some(event) = event {
                         event_task_tx
                             .send(event)

@@ -55,7 +55,7 @@ pub mod models;
 pub mod msnp_list;
 mod notification_server;
 mod passport_auth;
-mod receive_split_into_base64;
+mod receive_split;
 pub mod sdk_error;
 pub mod switchboard;
 

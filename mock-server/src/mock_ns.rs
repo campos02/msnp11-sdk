@@ -1,4 +1,3 @@
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use log::{error, trace};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -24,45 +23,40 @@ impl MockNS {
                     }
 
                     let mut messages_bytes = &buf[..received];
-                    let mut base64_messages: Vec<String> = Vec::new();
+                    let mut messages: Vec<&[u8]> = Vec::new();
 
                     loop {
                         let messages_string = unsafe { str::from_utf8_unchecked(&messages_bytes) };
-                        let messages: Vec<String> = messages_string
+                        let message_lines: Vec<String> = messages_string
                             .lines()
                             .map(|line| line.to_string() + "\r\n")
                             .collect();
 
-                        if messages.len() == 0 {
+                        if message_lines.len() == 0 {
                             break;
                         }
 
-                        let args: Vec<&str> = messages[0].trim().split(' ').collect();
+                        let args: Vec<&str> = message_lines[0].trim().split(' ').collect();
                         match args[0] {
                             "UUX" => {
                                 let length = args[2].parse::<usize>().unwrap();
-                                let length = messages[0].len() + length;
+                                let length = message_lines[0].len() + length;
 
                                 let new_bytes = &messages_bytes[..length];
                                 messages_bytes = &messages_bytes[length..];
-
-                                let base64_message = STANDARD.encode(&new_bytes);
-                                base64_messages.push(base64_message);
+                                messages.push(new_bytes);
                             }
 
                             _ => {
-                                let new_bytes = &messages_bytes[..messages[0].len()];
-                                messages_bytes = &messages_bytes[messages[0].len()..];
-
-                                let base64_message = STANDARD.encode(new_bytes);
-                                base64_messages.push(base64_message);
+                                let new_bytes = &messages_bytes[..message_lines[0].len()];
+                                messages_bytes = &messages_bytes[message_lines[0].len()..];
+                                messages.push(new_bytes);
                             }
                         }
                     }
 
-                    for base64_message in base64_messages {
-                        let message_bytes = STANDARD.decode(base64_message).unwrap();
-                        let message = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) };
+                    for message in messages {
+                        let message = unsafe { str::from_utf8_unchecked(message) };
                         trace!("C: {message}");
 
                         let replies: &[&str] = match message {

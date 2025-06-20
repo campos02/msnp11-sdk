@@ -3,15 +3,10 @@ use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
 use crate::msnp_list::MsnpList;
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 
-pub fn into_event(base64_message: &String) -> Option<Event> {
-    let message_bytes = STANDARD
-        .decode(base64_message)
-        .expect("Could not decode socket message from base64");
-
-    let reply = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) };
+pub fn into_event(message: &Vec<u8>) -> Option<Event> {
+    let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) };
     let command = reply
         .lines()
         .next()
@@ -194,12 +189,8 @@ pub fn into_event(base64_message: &String) -> Option<Event> {
     }
 }
 
-pub fn into_internal_event(base64_message: &String) -> InternalEvent {
-    let message_bytes = STANDARD
-        .decode(base64_message)
-        .expect("Could not decode socket message from base64");
-
-    let reply = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) }.to_string();
+pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
+    let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) }.to_string();
     let command = reply
         .lines()
         .next()

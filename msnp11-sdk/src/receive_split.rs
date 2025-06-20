@@ -1,13 +1,9 @@
 use crate::sdk_error::SdkError;
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
 use core::str;
 use tokio::io::AsyncReadExt;
 use tokio::net::tcp::OwnedReadHalf;
 
-pub(crate) async fn receive_split_into_base64(
-    rd: &mut OwnedReadHalf,
-) -> Result<Vec<String>, SdkError> {
+pub(crate) async fn receive_split(rd: &mut OwnedReadHalf) -> Result<Vec<Vec<u8>>, SdkError> {
     let mut buf = vec![0; 1664];
     let received = rd.read(&mut buf).await.unwrap_or(0);
 
@@ -16,20 +12,20 @@ pub(crate) async fn receive_split_into_base64(
     }
 
     let mut messages_bytes = buf[..received].to_vec();
-    let mut base64_messages: Vec<String> = Vec::new();
+    let mut messages: Vec<Vec<u8>> = Vec::new();
 
     loop {
         let messages_string = unsafe { str::from_utf8_unchecked(&messages_bytes) };
-        let messages: Vec<String> = messages_string
+        let message_lines: Vec<String> = messages_string
             .lines()
             .map(|line| line.to_string() + "\r\n")
             .collect();
 
-        if messages.len() == 0 {
+        if message_lines.len() == 0 {
             break;
         }
 
-        let args: Vec<&str> = messages[0].trim().split(' ').collect();
+        let args: Vec<&str> = message_lines[0].trim().split(' ').collect();
         match args[0] {
             "GCF" | "UBX" | "MSG" => {
                 let length_index = match args[0] {
@@ -41,7 +37,7 @@ pub(crate) async fn receive_split_into_base64(
                     continue;
                 };
 
-                let length = messages[0].len() + length;
+                let length = message_lines[0].len() + length;
                 if length > messages_bytes.len() {
                     let mut buf = vec![0; 1664];
                     let received = rd.read(&mut buf).await.unwrap_or(0);
@@ -56,15 +52,15 @@ pub(crate) async fn receive_split_into_base64(
                 }
 
                 let new_bytes = messages_bytes.drain(..length);
-                base64_messages.push(STANDARD.encode(new_bytes));
+                messages.push(new_bytes.as_ref().to_vec());
             }
 
             _ => {
-                let new_bytes = messages_bytes.drain(..messages[0].len());
-                base64_messages.push(STANDARD.encode(new_bytes));
+                let new_bytes = messages_bytes.drain(..message_lines[0].len());
+                messages.push(new_bytes.as_ref().to_vec());
             }
         }
     }
 
-    Ok(base64_messages)
+    Ok(messages)
 }
