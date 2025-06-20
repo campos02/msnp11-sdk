@@ -23,7 +23,7 @@ impl MockNS {
                         break;
                     }
 
-                    let mut messages_bytes = buf[..received].to_vec();
+                    let mut messages_bytes = &buf[..received];
                     let mut base64_messages: Vec<String> = Vec::new();
 
                     loop {
@@ -43,18 +43,18 @@ impl MockNS {
                                 let length = args[2].parse::<usize>().unwrap();
                                 let length = messages[0].len() + length;
 
-                                let new_bytes = messages_bytes[..length].to_vec();
-                                messages_bytes = messages_bytes[length..].to_vec();
+                                let new_bytes = &messages_bytes[..length];
+                                messages_bytes = &messages_bytes[length..];
 
                                 let base64_message = STANDARD.encode(&new_bytes);
                                 base64_messages.push(base64_message);
                             }
 
                             _ => {
-                                let new_bytes = messages_bytes[..messages[0].len()].to_vec();
-                                messages_bytes = messages_bytes[messages[0].len()..].to_vec();
+                                let new_bytes = &messages_bytes[..messages[0].len()];
+                                messages_bytes = &messages_bytes[messages[0].len()..];
 
-                                let base64_message = STANDARD.encode(&new_bytes);
+                                let base64_message = STANDARD.encode(new_bytes);
                                 base64_messages.push(base64_message);
                             }
                         }

@@ -108,8 +108,8 @@ impl DisplayPictureSession {
         Ok(invite)
     }
 
-    pub fn acknowledge(mut payload: Vec<u8>) -> Result<Vec<u8>, SdkError> {
-        let binary_header: Vec<u8> = payload.drain(..48).collect();
+    pub fn acknowledge(payload: &[u8]) -> Result<Vec<u8>, SdkError> {
+        let binary_header = &payload[..48];
         let mut cursor = Cursor::new(binary_header);
 
         let (_, binary_header) = BinaryHeader::from_reader((&mut cursor, 0))

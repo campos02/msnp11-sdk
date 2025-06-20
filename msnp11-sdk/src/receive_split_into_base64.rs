@@ -50,24 +50,18 @@ pub(crate) async fn receive_split_into_base64(
                         return Err(SdkError::Disconnected);
                     }
 
-                    let mut buf = buf[..received].to_vec();
-                    messages_bytes.append(&mut buf);
+                    let buf = &buf[..received];
+                    messages_bytes.extend_from_slice(buf);
                     continue;
                 }
 
-                let new_bytes = messages_bytes[..length].to_vec();
-                messages_bytes = messages_bytes[length..].to_vec();
-
-                let base64_message = STANDARD.encode(&new_bytes);
-                base64_messages.push(base64_message);
+                let new_bytes = messages_bytes.drain(..length);
+                base64_messages.push(STANDARD.encode(new_bytes));
             }
 
             _ => {
-                let new_bytes = messages_bytes[..messages[0].len()].to_vec();
-                messages_bytes = messages_bytes[messages[0].len()..].to_vec();
-
-                let base64_message = STANDARD.encode(&new_bytes);
-                base64_messages.push(base64_message);
+                let new_bytes = messages_bytes.drain(..messages[0].len());
+                base64_messages.push(STANDARD.encode(new_bytes));
             }
         }
     }

@@ -12,7 +12,7 @@ pub fn into_event(base64_message: &String) -> Option<Event> {
         .decode(base64_message)
         .expect("Could not decode socket message from base64");
 
-    let reply = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) }.to_string();
+    let reply = unsafe { str::from_utf8_unchecked(message_bytes.as_slice()) };
     let command = reply
         .lines()
         .next()
@@ -110,7 +110,7 @@ pub fn into_internal_event(base64_message: &String) -> InternalEvent {
                     [(command.len() + msg_headers.len() + "\r\n\r\n".len())..]
                     .to_vec();
 
-                let binary_header = message_bytes[..48].to_vec();
+                let binary_header = &message_bytes[..48];
                 let mut cursor = Cursor::new(binary_header);
                 let Ok((_, binary_header)) = BinaryHeader::from_reader((&mut cursor, 0)) else {
                     return InternalEvent::ServerReply(reply);

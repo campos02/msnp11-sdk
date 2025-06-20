@@ -127,9 +127,7 @@ impl Switchboard {
                             continue;
                         }
 
-                        let invite_string =
-                            unsafe { str::from_utf8_unchecked(invite.as_slice()) }.to_string();
-
+                        let invite_string = unsafe { str::from_utf8_unchecked(invite.as_slice()) };
                         let mut invite_parameters = invite_string.lines();
                         invite_parameters.next();
 
@@ -150,7 +148,7 @@ impl Switchboard {
                             continue;
                         };
 
-                        let Ok(ack_payload) = DisplayPictureSession::acknowledge(invite) else {
+                        let Ok(ack_payload) = DisplayPictureSession::acknowledge(&invite) else {
                             continue;
                         };
 
@@ -264,7 +262,7 @@ impl Switchboard {
                         };
 
                         let from = from.replace("From: <msnmsgr:", "").replace(">", "");
-                        let Ok(ack_payload) = DisplayPictureSession::acknowledge(bye) else {
+                        let Ok(ack_payload) = DisplayPictureSession::acknowledge(&bye) else {
                             continue;
                         };
 
@@ -444,7 +442,7 @@ impl Switchboard {
                         continue;
                     }
 
-                    let ack = DisplayPictureSession::acknowledge(message)?;
+                    let ack = DisplayPictureSession::acknowledge(&message)?;
                     Msg::send_p2p(
                         &self.tr_id,
                         &self.sb_tx,
@@ -463,7 +461,7 @@ impl Switchboard {
                         continue;
                     }
 
-                    let ack = DisplayPictureSession::acknowledge(message)?;
+                    let ack = DisplayPictureSession::acknowledge(&message)?;
                     Msg::send_p2p(
                         &self.tr_id,
                         &self.sb_tx,
@@ -482,14 +480,14 @@ impl Switchboard {
                         continue;
                     }
 
-                    let binary_header = data[..48].to_vec();
+                    let binary_header = &data[..48];
                     let mut cursor = Cursor::new(binary_header);
                     let (_, binary_header) = BinaryHeader::from_reader((&mut cursor, 0))
                         .or(Err(SdkError::BinaryHeaderReadingError))?;
 
                     picture.extend_from_slice(&data[48..]);
                     if picture.len() == binary_header.total_data_size as usize {
-                        let ack = DisplayPictureSession::acknowledge(data)?;
+                        let ack = DisplayPictureSession::acknowledge(&data)?;
                         Msg::send_p2p(
                             &self.tr_id,
                             &self.sb_tx,
