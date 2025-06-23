@@ -5,6 +5,7 @@ use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
 use crate::models::user_data::UserData;
 use crate::msnp_list::MsnpList;
+use crate::msnp_status::MsnpStatus;
 use crate::notification_server::commands::adc::Adc;
 use crate::notification_server::commands::adg::Adg;
 use crate::notification_server::commands::blp::Blp;
@@ -273,8 +274,8 @@ impl Client {
         Ok(Event::Authenticated)
     }
 
-    /// Sets the user's presence status. One of MSNP's status strings(e.g. `NLN` for online) is required as the argument.
-    pub async fn set_presence(&self, presence: String) -> Result<(), SdkError> {
+    /// Sets the user's presence status.
+    pub async fn set_presence(&self, presence: MsnpStatus) -> Result<(), SdkError> {
         let msn_object;
         {
             let user_data = self

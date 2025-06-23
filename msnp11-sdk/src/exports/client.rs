@@ -1,4 +1,5 @@
 use crate::event_handler::EventHandler;
+use crate::msnp_status::MsnpStatus;
 use crate::sdk_error::SdkError;
 use crate::{Event, MsnpList, PersonalMessage, Switchboard};
 use std::sync::Arc;
@@ -43,8 +44,8 @@ impl Client {
             .block_on(async { self.inner.login(email, password, nexus_url).await })
     }
 
-    /// Sets the user's presence status. One of MSNP's status strings(e.g. `NLN` for online) is required as the argument.
-    pub async fn set_presence(&self, presence: String) -> Result<(), SdkError> {
+    /// Sets the user's presence status.
+    pub async fn set_presence(&self, presence: MsnpStatus) -> Result<(), SdkError> {
         self.inner.set_presence(presence).await
     }
 

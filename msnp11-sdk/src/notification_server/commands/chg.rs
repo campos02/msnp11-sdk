@@ -1,5 +1,6 @@
 use crate::internal_event::InternalEvent;
 use crate::models::presence::Presence;
+use crate::msnp_status::MsnpStatus;
 use crate::sdk_error::SdkError;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -17,10 +18,18 @@ impl Chg {
         tr_id.fetch_add(1, Ordering::SeqCst);
         let tr_id = tr_id.load(Ordering::SeqCst);
 
-        let mut command = format!(
-            "CHG {tr_id} {} {}\r\n",
-            presence.presence, presence.client_id
-        );
+        let status = match presence.status {
+            MsnpStatus::Online => "NLN",
+            MsnpStatus::Busy => "BSY",
+            MsnpStatus::Away => "AWY",
+            MsnpStatus::Idle => "IDL",
+            MsnpStatus::OutToLunch => "LUN",
+            MsnpStatus::OnThePhone => "PHN",
+            MsnpStatus::BeRightBack => "BRB",
+            MsnpStatus::AppearOffline => "HDN",
+        };
+
+        let mut command = format!("CHG {tr_id} {status} {}\r\n", presence.client_id);
 
         if let Some(msn_object) = &presence.msn_object {
             command = command.replace(

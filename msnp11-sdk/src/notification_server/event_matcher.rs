@@ -3,6 +3,7 @@ use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
 use crate::msnp_list::MsnpList;
+use crate::msnp_status::MsnpStatus;
 use core::str;
 
 pub fn into_event(message: &Vec<u8>) -> Option<Event> {
@@ -123,13 +124,23 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
                 None
             };
 
+            let status = match args[base_index + 1] {
+                "BSY" => MsnpStatus::Busy,
+                "AWY" => MsnpStatus::Away,
+                "IDL" => MsnpStatus::Idle,
+                "LUN" => MsnpStatus::OutToLunch,
+                "PHN" => MsnpStatus::OnThePhone,
+                "BRB" => MsnpStatus::BeRightBack,
+                _ => MsnpStatus::Online,
+            };
+
             Some(Event::PresenceUpdate {
                 email: args[base_index + 2].to_string(),
                 display_name: urlencoding::decode(args[base_index + 3])
                     .expect("Could not url decode contact name")
                     .to_string(),
                 presence: Presence {
-                    presence: args[base_index + 1].to_string(),
+                    status,
                     client_id: args[base_index + 4].to_string().parse().unwrap_or(0),
                     msn_object,
                 },

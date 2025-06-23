@@ -25,7 +25,10 @@ async fn login() {
             .unwrap();
     }
 
-    client.set_presence("NLN".to_string()).await.unwrap();
+    client
+        .set_presence(msnp11_sdk::msnp_status::MsnpStatus::Online)
+        .await
+        .unwrap();
     client
         .set_personal_message(&msnp11_sdk::models::personal_message::PersonalMessage {
             psm: "test".to_string(),
@@ -87,7 +90,7 @@ async fn login() {
             assert_eq!(
                 presence,
                 msnp11_sdk::models::presence::Presence {
-                    presence: "NLN".to_string(),
+                    status: msnp11_sdk::msnp_status::MsnpStatus::Online,
                     client_id: 1073741824,
                     msn_object: Some("<msnobj Creator=\"".to_string())
                 }

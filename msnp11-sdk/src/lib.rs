@@ -1,10 +1,10 @@
 //! An MSNP11 client SDK. Still a WIP, but messaging and some contact actions have tests that confirm they're working.
-//! Other features like display picture transfers are present but still untested.
 //! # Login
 //! ```
 //! use msnp11_sdk::client::Client;
 //! use msnp11_sdk::event::Event;
 //! use msnp11_sdk::models::personal_message::PersonalMessage;
+//! use msnp11_sdk::msnp_status::MsnpStatus;
 //!
 //! let mut client = Client::new("127.0.0.1".to_string(), "1863".to_string())
 //!    .await
@@ -32,7 +32,7 @@
 //!         .unwrap();
 //!  }
 //!
-//! client.set_presence("NLN".to_string()).await.unwrap();
+//! client.set_presence(MsnpStatus::Online).await.unwrap();
 //! client
 //!     .set_personal_message(&PersonalMessage {
 //!         psm: "test".to_string(),
@@ -53,6 +53,7 @@ mod exports;
 mod internal_event;
 pub mod models;
 pub mod msnp_list;
+pub mod msnp_status;
 mod notification_server;
 mod passport_auth;
 mod receive_split;
