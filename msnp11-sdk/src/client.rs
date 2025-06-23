@@ -1,11 +1,11 @@
-use crate::event::Event;
+use crate::enums::event::Event;
 use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
-use crate::models::user_data::UserData;
-use crate::msnp_list::MsnpList;
-use crate::msnp_status::MsnpStatus;
+use crate::user_data::UserData;
+use crate::enums::msnp_list::MsnpList;
+use crate::enums::msnp_status::MsnpStatus;
 use crate::notification_server::commands::adc::Adc;
 use crate::notification_server::commands::adg::Adg;
 use crate::notification_server::commands::blp::Blp;

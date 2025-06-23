@@ -6,7 +6,7 @@ async fn create_session() {
         .await
         .unwrap();
 
-    let result: msnp11_sdk::event::Event = match client
+    let result: msnp11_sdk::enums::event::Event = match client
         .login(
             "testing@example.com".to_string(),
             "123456".to_string(),
@@ -14,7 +14,7 @@ async fn create_session() {
         )
         .await
     {
-        Ok(msnp11_sdk::event::Event::RedirectedTo { server, port }) => {
+        Ok(msnp11_sdk::enums::event::Event::RedirectedTo { server, port }) => {
             client = msnp11_sdk::client::Client::new(server, port).await.unwrap();
             client
                 .login(
@@ -26,13 +26,13 @@ async fn create_session() {
                 .unwrap()
         }
 
-        Ok(msnp11_sdk::event::Event::Authenticated) => msnp11_sdk::event::Event::Authenticated,
+        Ok(msnp11_sdk::enums::event::Event::Authenticated) => msnp11_sdk::enums::event::Event::Authenticated,
         Err(err) => panic!("Login error: {err}"),
 
-        _ => msnp11_sdk::event::Event::Disconnected,
+        _ => msnp11_sdk::enums::event::Event::Disconnected,
     };
 
-    assert!(matches!(result, msnp11_sdk::event::Event::Authenticated));
+    assert!(matches!(result, msnp11_sdk::enums::event::Event::Authenticated));
 
     let message = msnp11_sdk::models::plain_text::PlainText {
         bold: false,
@@ -51,21 +51,21 @@ async fn create_session() {
     switchboard.send_text_message(&message).await.unwrap();
 
     switchboard.add_event_handler_closure(|event| match event {
-        msnp11_sdk::event::Event::ParticipantInSwitchboard { email } => {
+        msnp11_sdk::enums::event::Event::ParticipantInSwitchboard { email } => {
             assert_eq!(email, "bob@passport.com");
         }
 
-        msnp11_sdk::event::Event::TextMessage { email, message } => {
+        msnp11_sdk::enums::event::Event::TextMessage { email, message } => {
             assert_eq!(email, "bob@passport.com");
             assert_eq!(message.color, "ff0000");
             assert_eq!(message.text, "h");
         }
 
-        msnp11_sdk::event::Event::Nudge { email } => {
+        msnp11_sdk::enums::event::Event::Nudge { email } => {
             assert_eq!(email, "bob@passport.com");
         }
 
-        msnp11_sdk::event::Event::ParticipantLeftSwitchboard { email } => {
+        msnp11_sdk::enums::event::Event::ParticipantLeftSwitchboard { email } => {
             assert_eq!(email, "bob@passport.com");
         }
 
@@ -85,7 +85,7 @@ async fn join_session() {
         .await
         .unwrap();
 
-    let result: msnp11_sdk::event::Event = match client
+    let result: msnp11_sdk::enums::event::Event = match client
         .login(
             "testing@example.com".to_string(),
             "123456".to_string(),
@@ -93,7 +93,7 @@ async fn join_session() {
         )
         .await
     {
-        Ok(msnp11_sdk::event::Event::RedirectedTo { server, port }) => {
+        Ok(msnp11_sdk::enums::event::Event::RedirectedTo { server, port }) => {
             client = msnp11_sdk::client::Client::new(server, port).await.unwrap();
             client
                 .login(
@@ -105,34 +105,34 @@ async fn join_session() {
                 .unwrap()
         }
 
-        Ok(msnp11_sdk::event::Event::Authenticated) => msnp11_sdk::event::Event::Authenticated,
+        Ok(msnp11_sdk::enums::event::Event::Authenticated) => msnp11_sdk::enums::event::Event::Authenticated,
         Err(err) => panic!("Login error: {err}"),
-        _ => msnp11_sdk::event::Event::Disconnected,
+        _ => msnp11_sdk::enums::event::Event::Disconnected,
     };
 
-    assert!(matches!(result, msnp11_sdk::event::Event::Authenticated));
+    assert!(matches!(result, msnp11_sdk::enums::event::Event::Authenticated));
 
     // GTC abuse from the mock server
     client.set_gtc(&"ReceiveRNG".to_string()).await.unwrap();
 
     client.add_event_handler_closure(|event| match event {
-        msnp11_sdk::event::Event::SessionAnswered(switchboard) => {
+        msnp11_sdk::enums::event::Event::SessionAnswered(switchboard) => {
             switchboard.add_event_handler_closure(|event| match event {
-                msnp11_sdk::event::Event::ParticipantInSwitchboard { email } => {
+                msnp11_sdk::enums::event::Event::ParticipantInSwitchboard { email } => {
                     assert_eq!(email, "bob@passport.com");
                 }
 
-                msnp11_sdk::event::Event::TextMessage { email, message } => {
+                msnp11_sdk::enums::event::Event::TextMessage { email, message } => {
                     assert_eq!(email, "bob@passport.com");
                     assert_eq!(message.color, "ff0000");
                     assert_eq!(message.text, "h");
                 }
 
-                msnp11_sdk::event::Event::Nudge { email } => {
+                msnp11_sdk::enums::event::Event::Nudge { email } => {
                     assert_eq!(email, "bob@passport.com");
                 }
 
-                msnp11_sdk::event::Event::ParticipantLeftSwitchboard { email } => {
+                msnp11_sdk::enums::event::Event::ParticipantLeftSwitchboard { email } => {
                     assert_eq!(email, "bob@passport.com");
                 }
 

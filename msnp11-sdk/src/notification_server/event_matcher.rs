@@ -1,9 +1,9 @@
-use crate::event::Event;
+use crate::enums::event::Event;
 use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
-use crate::msnp_list::MsnpList;
-use crate::msnp_status::MsnpStatus;
+use crate::enums::msnp_list::MsnpList;
+use crate::enums::msnp_status::MsnpStatus;
 use core::str;
 
 pub fn into_event(message: &Vec<u8>) -> Option<Event> {

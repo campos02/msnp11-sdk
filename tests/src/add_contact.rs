@@ -6,7 +6,7 @@ async fn add_contact() {
         .await
         .unwrap();
 
-    let result: msnp11_sdk::event::Event = match client
+    let result: msnp11_sdk::enums::event::Event = match client
         .login(
             "testing@example.com".to_string(),
             "123456".to_string(),
@@ -14,7 +14,7 @@ async fn add_contact() {
         )
         .await
     {
-        Ok(msnp11_sdk::event::Event::RedirectedTo { server, port }) => {
+        Ok(msnp11_sdk::enums::event::Event::RedirectedTo { server, port }) => {
             client = msnp11_sdk::client::Client::new(server, port).await.unwrap();
             client
                 .login(
@@ -26,14 +26,14 @@ async fn add_contact() {
                 .unwrap()
         }
 
-        Ok(msnp11_sdk::event::Event::Authenticated) => msnp11_sdk::event::Event::Authenticated,
+        Ok(msnp11_sdk::enums::event::Event::Authenticated) => msnp11_sdk::enums::event::Event::Authenticated,
         Err(err) => panic!("Login error: {err}"),
-        _ => msnp11_sdk::event::Event::Disconnected,
+        _ => msnp11_sdk::enums::event::Event::Disconnected,
     };
 
-    assert!(matches!(result, msnp11_sdk::event::Event::Authenticated));
+    assert!(matches!(result, msnp11_sdk::enums::event::Event::Authenticated));
 
-    if let msnp11_sdk::event::Event::ContactInForwardList {
+    if let msnp11_sdk::enums::event::Event::ContactInForwardList {
         email,
         display_name,
         guid,
@@ -43,7 +43,7 @@ async fn add_contact() {
         .add_contact(
             &"bob@passport.com".to_string(),
             &"Bob".to_string(),
-            msnp11_sdk::msnp_list::MsnpList::ForwardList,
+            msnp11_sdk::enums::msnp_list::MsnpList::ForwardList,
         )
         .await
         .unwrap()
@@ -52,10 +52,10 @@ async fn add_contact() {
         assert_eq!(display_name, "Bob");
         assert_eq!(guid, "6bd736b8-dc18-44c6-ad61-8cd12d641e79");
         assert_eq!(groups.len(), 0);
-        assert_eq!(lists, vec![msnp11_sdk::msnp_list::MsnpList::ForwardList]);
+        assert_eq!(lists, vec![msnp11_sdk::enums::msnp_list::MsnpList::ForwardList]);
     }
 
-    if let msnp11_sdk::event::Event::Contact {
+    if let msnp11_sdk::enums::event::Event::Contact {
         email,
         display_name,
         lists,
@@ -63,18 +63,18 @@ async fn add_contact() {
         .add_contact(
             &"fred@passport.com".to_string(),
             &"Fred".to_string(),
-            msnp11_sdk::msnp_list::MsnpList::AllowList,
+            msnp11_sdk::enums::msnp_list::MsnpList::AllowList,
         )
         .await
         .unwrap()
     {
         assert_eq!(email, "fred@passport.com");
         assert_eq!(display_name, "Fred");
-        assert_eq!(lists, vec![msnp11_sdk::msnp_list::MsnpList::AllowList]);
+        assert_eq!(lists, vec![msnp11_sdk::enums::msnp_list::MsnpList::AllowList]);
     }
 
     client.add_event_handler_closure(|event| match event {
-        msnp11_sdk::event::Event::AddedBy {
+        msnp11_sdk::enums::event::Event::AddedBy {
             email,
             display_name,
         } => {

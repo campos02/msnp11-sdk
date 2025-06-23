@@ -6,7 +6,7 @@ async fn login() {
         .await
         .unwrap();
 
-    if let Ok(msnp11_sdk::event::Event::RedirectedTo { server, port }) = client
+    if let Ok(msnp11_sdk::enums::event::Event::RedirectedTo { server, port }) = client
         .login(
             "testing@example.com".to_string(),
             "123456".to_string(),
@@ -26,7 +26,7 @@ async fn login() {
     }
 
     client
-        .set_presence(msnp11_sdk::msnp_status::MsnpStatus::Online)
+        .set_presence(msnp11_sdk::enums::msnp_status::MsnpStatus::Online)
         .await
         .unwrap();
     client
@@ -38,18 +38,18 @@ async fn login() {
         .unwrap();
 
     client.add_event_handler_closure(|event| match event {
-        msnp11_sdk::event::Event::Gtc(gtc) => assert_eq!(gtc, "A"),
-        msnp11_sdk::event::Event::Blp(blp) => assert_eq!(blp, "AL"),
-        msnp11_sdk::event::Event::DisplayName(display_name) => {
+        msnp11_sdk::enums::event::Event::Gtc(gtc) => assert_eq!(gtc, "A"),
+        msnp11_sdk::enums::event::Event::Blp(blp) => assert_eq!(blp, "AL"),
+        msnp11_sdk::enums::event::Event::DisplayName(display_name) => {
             assert_eq!(display_name, "Testing")
         }
 
-        msnp11_sdk::event::Event::Group { name, guid: id } => {
+        msnp11_sdk::enums::event::Event::Group { name, guid: id } => {
             assert_eq!(name, "Mock Contacts");
             assert_eq!(id, "124153dc-a695-4f6c-93e8-8e07c9775251");
         }
 
-        msnp11_sdk::event::Event::ContactInForwardList {
+        msnp11_sdk::enums::event::Event::ContactInForwardList {
             email,
             display_name,
             guid,
@@ -63,24 +63,24 @@ async fn login() {
             assert_eq!(
                 lists,
                 vec![
-                    msnp11_sdk::msnp_list::MsnpList::ForwardList,
-                    msnp11_sdk::msnp_list::MsnpList::BlockList,
-                    msnp11_sdk::msnp_list::MsnpList::ReverseList
+                    msnp11_sdk::enums::msnp_list::MsnpList::ForwardList,
+                    msnp11_sdk::enums::msnp_list::MsnpList::BlockList,
+                    msnp11_sdk::enums::msnp_list::MsnpList::ReverseList
                 ]
             )
         }
 
-        msnp11_sdk::event::Event::Contact {
+        msnp11_sdk::enums::event::Event::Contact {
             email,
             display_name,
             lists,
         } => {
             assert_eq!(email, "fred@passport.com");
             assert_eq!(display_name, "Fred");
-            assert_eq!(lists, vec![msnp11_sdk::msnp_list::MsnpList::AllowList])
+            assert_eq!(lists, vec![msnp11_sdk::enums::msnp_list::MsnpList::AllowList])
         }
 
-        msnp11_sdk::event::Event::PresenceUpdate {
+        msnp11_sdk::enums::event::Event::PresenceUpdate {
             email,
             display_name,
             presence,
@@ -90,14 +90,14 @@ async fn login() {
             assert_eq!(
                 presence,
                 msnp11_sdk::models::presence::Presence {
-                    status: msnp11_sdk::msnp_status::MsnpStatus::Online,
+                    status: msnp11_sdk::enums::msnp_status::MsnpStatus::Online,
                     client_id: 1073741824,
                     msn_object: Some("<msnobj Creator=\"".to_string())
                 }
             );
         }
 
-        msnp11_sdk::event::Event::PersonalMessageUpdate {
+        msnp11_sdk::enums::event::Event::PersonalMessageUpdate {
             email,
             personal_message,
         } => {

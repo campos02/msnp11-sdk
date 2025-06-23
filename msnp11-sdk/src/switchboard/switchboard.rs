@@ -1,8 +1,8 @@
-use crate::event::Event;
+use crate::enums::event::Event;
 use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
-use crate::models::user_data::UserData;
+use crate::user_data::UserData;
 use crate::receive_split::receive_split;
 use crate::sdk_error::SdkError;
 use crate::switchboard::commands::ans::Ans;

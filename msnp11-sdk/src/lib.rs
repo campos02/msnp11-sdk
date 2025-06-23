@@ -2,9 +2,9 @@
 //! # Login
 //! ```
 //! use msnp11_sdk::client::Client;
-//! use msnp11_sdk::event::Event;
+//! use msnp11_sdk::enums::event::Event;
 //! use msnp11_sdk::models::personal_message::PersonalMessage;
-//! use msnp11_sdk::msnp_status::MsnpStatus;
+//! use msnp11_sdk::enums::msnp_status::MsnpStatus;
 //!
 //! let mut client = Client::new("127.0.0.1".to_string(), "1863".to_string())
 //!    .await
@@ -47,25 +47,25 @@
 //!
 
 pub mod client;
-pub mod event;
 pub mod event_handler;
 mod exports;
 mod internal_event;
 pub mod models;
-pub mod msnp_list;
-pub mod msnp_status;
 mod notification_server;
 mod passport_auth;
 mod receive_split;
 pub mod sdk_error;
 pub mod switchboard;
+pub mod enums;
+mod user_data;
 
 uniffi::setup_scaffolding!();
 
 pub use client::Client;
-pub use event::Event;
+pub use enums::event::Event;
 pub use models::personal_message::PersonalMessage;
 pub use models::plain_text::PlainText;
 pub use models::presence::Presence;
-pub use msnp_list::MsnpList;
+pub use enums::msnp_list::MsnpList;
+pub use enums::msnp_status::MsnpStatus;
 pub use switchboard::switchboard::Switchboard;

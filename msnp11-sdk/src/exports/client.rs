@@ -1,5 +1,5 @@
 use crate::event_handler::EventHandler;
-use crate::msnp_status::MsnpStatus;
+use crate::enums::msnp_status::MsnpStatus;
 use crate::sdk_error::SdkError;
 use crate::{Event, MsnpList, PersonalMessage, Switchboard};
 use std::sync::Arc;

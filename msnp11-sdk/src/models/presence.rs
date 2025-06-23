@@ -1,4 +1,4 @@
-use crate::msnp_status::MsnpStatus;
+use crate::enums::msnp_status::MsnpStatus;
 
 /// Represents a contact's presence information.
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]

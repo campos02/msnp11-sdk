@@ -1,5 +1,5 @@
 use crate::internal_event::InternalEvent;
-use crate::models::user_data::UserData;
+use crate::user_data::UserData;
 use crate::sdk_error::SdkError;
 use crate::switchboard::switchboard::Switchboard;
 use log::trace;
