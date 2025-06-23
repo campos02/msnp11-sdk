@@ -3,8 +3,9 @@ name = "msnp11-sdk"
 description = "An MSNP11 client SDK"
 repository = "https://github.com/campos02/msnp11-sdk"
 license = "MIT"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
+readme = "../README.md"
 
 [dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "io-util", "net", "macros", "sync", "time"] }
