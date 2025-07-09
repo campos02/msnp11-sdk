@@ -1,11 +1,10 @@
 use crate::enums::event::Event;
+use crate::enums::msnp_list::MsnpList;
+use crate::enums::msnp_status::MsnpStatus;
 use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
-use crate::user_data::UserData;
-use crate::enums::msnp_list::MsnpList;
-use crate::enums::msnp_status::MsnpStatus;
 use crate::notification_server::commands::adc::Adc;
 use crate::notification_server::commands::adg::Adg;
 use crate::notification_server::commands::blp::Blp;
@@ -29,6 +28,7 @@ use crate::passport_auth::PassportAuth;
 use crate::receive_split::receive_split;
 use crate::sdk_error::SdkError;
 use crate::switchboard::switchboard::Switchboard;
+use crate::user_data::UserData;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use log::trace;
@@ -197,14 +197,15 @@ impl Client {
 
     /// Adds a handler closure. If you're using this SDK with Rust, not through a foreign binding, then this is the preferred method of
     /// handling events.
-    pub fn add_event_handler_closure<F>(&self, f: F)
+    pub fn add_event_handler_closure<F, R>(&self, f: F)
     where
-        F: Fn(Event) + Send + 'static,
+        F: Fn(Event) -> R + Send + 'static,
+        R: Future<Output = ()> + Send,
     {
         let event_rx = self.event_rx.clone();
         tokio::spawn(async move {
             while let Ok(event) = event_rx.recv().await {
-                f(event);
+                f(event).await;
             }
         });
     }

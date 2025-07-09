@@ -1,7 +1,7 @@
 use crate::internal_event::InternalEvent;
-use crate::user_data::UserData;
 use crate::sdk_error::SdkError;
 use crate::switchboard::switchboard::Switchboard;
+use crate::user_data::UserData;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};

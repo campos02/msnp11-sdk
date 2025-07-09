@@ -1,5 +1,5 @@
-use crate::internal_event::InternalEvent;
 use crate::enums::msnp_list::MsnpList;
+use crate::internal_event::InternalEvent;
 use crate::sdk_error::SdkError;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};

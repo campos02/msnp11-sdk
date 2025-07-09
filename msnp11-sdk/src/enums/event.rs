@@ -1,7 +1,7 @@
+use crate::enums::msnp_list::MsnpList;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::plain_text::PlainText;
 use crate::models::presence::Presence;
-use crate::enums::msnp_list::MsnpList;
 use crate::switchboard::switchboard::Switchboard;
 use std::sync::Arc;
 

@@ -2,7 +2,6 @@ use crate::enums::event::Event;
 use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
-use crate::user_data::UserData;
 use crate::receive_split::receive_split;
 use crate::sdk_error::SdkError;
 use crate::switchboard::commands::ans::Ans;
@@ -12,6 +11,7 @@ use crate::switchboard::commands::usr::Usr;
 use crate::switchboard::event_matcher::{into_event, into_internal_event};
 use crate::switchboard::p2p::binary_header::BinaryHeader;
 use crate::switchboard::p2p::display_picture_session::DisplayPictureSession;
+use crate::user_data::UserData;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::DekuContainerRead;
@@ -331,14 +331,15 @@ impl Switchboard {
 
     /// Adds a handler closure. If you're using this SDK with Rust, not through a foreign binding, then this is the preferred method of
     /// handling events.
-    pub fn add_event_handler_closure<F>(&self, f: F)
+    pub fn add_event_handler_closure<F, R>(&self, f: F)
     where
-        F: Fn(Event) + Send + 'static,
+        F: Fn(Event) -> R + Send + 'static,
+        R: Future<Output = ()> + Send,
     {
         let event_rx = self.event_rx.clone();
         tokio::spawn(async move {
             while let Ok(event) = event_rx.recv().await {
-                f(event);
+                f(event).await;
             }
         });
     }

@@ -10,7 +10,7 @@
 //!    .await
 //!    .unwrap();
 //!
-//! client.add_event_handler_closure(|event| { /* Handle events... */ });
+//! client.add_event_handler_closure(|event| async { /* Handle events... */ });
 //!
 //! // Handle a redirection by creating a new connection
 //! if let Ok(Event::RedirectedTo { server, port }) = client
@@ -47,6 +47,7 @@
 //!
 
 pub mod client;
+pub mod enums;
 pub mod event_handler;
 mod exports;
 mod internal_event;
@@ -56,16 +57,15 @@ mod passport_auth;
 mod receive_split;
 pub mod sdk_error;
 pub mod switchboard;
-pub mod enums;
 mod user_data;
 
 uniffi::setup_scaffolding!();
 
 pub use client::Client;
 pub use enums::event::Event;
+pub use enums::msnp_list::MsnpList;
+pub use enums::msnp_status::MsnpStatus;
 pub use models::personal_message::PersonalMessage;
 pub use models::plain_text::PlainText;
 pub use models::presence::Presence;
-pub use enums::msnp_list::MsnpList;
-pub use enums::msnp_status::MsnpStatus;
 pub use switchboard::switchboard::Switchboard;

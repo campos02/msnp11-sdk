@@ -26,12 +26,17 @@ async fn add_contact() {
                 .unwrap()
         }
 
-        Ok(msnp11_sdk::enums::event::Event::Authenticated) => msnp11_sdk::enums::event::Event::Authenticated,
+        Ok(msnp11_sdk::enums::event::Event::Authenticated) => {
+            msnp11_sdk::enums::event::Event::Authenticated
+        }
         Err(err) => panic!("Login error: {err}"),
         _ => msnp11_sdk::enums::event::Event::Disconnected,
     };
 
-    assert!(matches!(result, msnp11_sdk::enums::event::Event::Authenticated));
+    assert!(matches!(
+        result,
+        msnp11_sdk::enums::event::Event::Authenticated
+    ));
 
     if let msnp11_sdk::enums::event::Event::ContactInForwardList {
         email,
@@ -52,7 +57,10 @@ async fn add_contact() {
         assert_eq!(display_name, "Bob");
         assert_eq!(guid, "6bd736b8-dc18-44c6-ad61-8cd12d641e79");
         assert_eq!(groups.len(), 0);
-        assert_eq!(lists, vec![msnp11_sdk::enums::msnp_list::MsnpList::ForwardList]);
+        assert_eq!(
+            lists,
+            vec![msnp11_sdk::enums::msnp_list::MsnpList::ForwardList]
+        );
     }
 
     if let msnp11_sdk::enums::event::Event::Contact {
@@ -70,19 +78,24 @@ async fn add_contact() {
     {
         assert_eq!(email, "fred@passport.com");
         assert_eq!(display_name, "Fred");
-        assert_eq!(lists, vec![msnp11_sdk::enums::msnp_list::MsnpList::AllowList]);
+        assert_eq!(
+            lists,
+            vec![msnp11_sdk::enums::msnp_list::MsnpList::AllowList]
+        );
     }
 
-    client.add_event_handler_closure(|event| match event {
-        msnp11_sdk::enums::event::Event::AddedBy {
-            email,
-            display_name,
-        } => {
-            assert_eq!(email, "fred@passport.com");
-            assert_eq!(display_name, "Fred");
-        }
+    client.add_event_handler_closure(|event| async {
+        match event {
+            msnp11_sdk::enums::event::Event::AddedBy {
+                email,
+                display_name,
+            } => {
+                assert_eq!(email, "fred@passport.com");
+                assert_eq!(display_name, "Fred");
+            }
 
-        _ => (),
+            _ => (),
+        }
     });
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
