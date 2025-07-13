@@ -52,21 +52,22 @@ pub struct Client {
 impl Client {
     /// Connects to the server, defines the channels and returns a new instance.
     pub async fn new(server: &str, port: &u16) -> Result<Self, SdkError> {
-        let server_ip = lookup_host(format!("{server}:{port}"))
+        let mut server_ips = lookup_host((server, *port))
             .await
-            .or(Err(SdkError::ResolutionError))?
-            .next()
+            .or(Err(SdkError::ResolutionError))?;
+
+        let server_ip = server_ips
+            .find(|ip| ip.is_ipv4())
             .ok_or(SdkError::ResolutionError)?
-            .ip()
-            .to_string();
+            .ip();
 
         let (event_tx, event_rx) = async_channel::bounded::<Event>(32);
         let (ns_tx, mut ns_rx) = mpsc::channel::<Vec<u8>>(16);
         let (internal_tx, _) = broadcast::channel::<InternalEvent>(64);
 
-        let socket = TcpStream::connect(format!("{server_ip}:{port}"))
+        let socket = TcpStream::connect((server_ip, *port))
             .await
-            .expect("Couldn't connect to server");
+            .expect("Couldn't connect to the server");
 
         let (mut rd, mut wr) = socket.into_split();
 
