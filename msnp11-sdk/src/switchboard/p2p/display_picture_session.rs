@@ -54,12 +54,7 @@ impl DisplayPictureSession {
         })
     }
 
-    pub fn invite(
-        &mut self,
-        to: &String,
-        from: &String,
-        msn_object: &String,
-    ) -> Result<Vec<u8>, SdkError> {
+    pub fn invite(&mut self, to: &str, from: &str, msn_object: &str) -> Result<Vec<u8>, SdkError> {
         let branch = guid_create::GUID::rand().to_string();
         let call_id = guid_create::GUID::rand().to_string();
         let session_id = rng().next_u32();
@@ -216,7 +211,7 @@ impl DisplayPictureSession {
         Ok(payloads)
     }
 
-    pub fn bye(&self, to: &String, from: &String) -> Result<Vec<u8>, SdkError> {
+    pub fn bye(&self, to: &str, from: &str) -> Result<Vec<u8>, SdkError> {
         let body = "\r\n\0";
 
         let mut headers = format!("BYE MSNMSGR:{to} MSNSLP/1.0\r\n");

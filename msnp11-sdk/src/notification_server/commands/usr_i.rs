@@ -11,7 +11,7 @@ impl UsrI {
         tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
         internal_rx: &mut broadcast::Receiver<InternalEvent>,
-        email: &String,
+        email: &str,
     ) -> Result<InternalEvent, SdkError> {
         tr_id.fetch_add(1, Ordering::SeqCst);
         let tr_id = tr_id.load(Ordering::SeqCst);
@@ -43,7 +43,7 @@ impl UsrI {
                             let server_and_port: Vec<&str> = args[3].trim().split(':').collect();
                             return Ok(InternalEvent::RedirectedTo {
                                 server: server_and_port[0].to_string(),
-                                port: server_and_port[1].to_string(),
+                                port: server_and_port[1].parse::<u16>().unwrap_or(1863),
                             });
                         }
                     }

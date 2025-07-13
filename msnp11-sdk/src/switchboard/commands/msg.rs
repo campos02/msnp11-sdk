@@ -114,7 +114,7 @@ impl Msg {
     pub async fn send_typing_user(
         tr_id: &AtomicU32,
         sb_tx: &mpsc::Sender<Vec<u8>>,
-        email: &String,
+        email: &str,
     ) -> Result<(), SdkError> {
         let mut payload = String::from("MIME-Version: 1.0\r\n");
         payload.push_str("Content-Type: text/x-msmsgscontrol\r\n");

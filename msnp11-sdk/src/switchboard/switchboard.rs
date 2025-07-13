@@ -288,7 +288,7 @@ impl Switchboard {
         Ok(())
     }
 
-    pub(crate) async fn login(&self, email: &String) -> Result<(), SdkError> {
+    pub(crate) async fn login(&self, email: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         Usr::send(
             &self.tr_id,
@@ -304,15 +304,15 @@ impl Switchboard {
 
     pub(crate) async fn answer(
         &self,
-        email: &String,
-        session_id: &String,
+        email: &str,
+        session_id: &str,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut internal_rx = self.internal_tx.subscribe();
         Ans::send(
             &self.tr_id,
             &self.sb_tx,
             &mut internal_rx,
-            &email,
+            email,
             &self.cki_string,
             session_id,
         )
@@ -358,7 +358,7 @@ impl Switchboard {
     }
 
     /// Invites a new contact to this switchboard session. This makes them temporary chat rooms.
-    pub async fn invite(&self, email: &String) -> Result<(), SdkError> {
+    pub async fn invite(&self, email: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
 
         let session_id = Some(Cal::send(&self.tr_id, &self.sb_tx, &mut internal_rx, email).await?);
@@ -394,15 +394,15 @@ impl Switchboard {
     }
 
     /// Sends an "is writing..." notification to the session.
-    pub async fn send_typing_user(&self, email: &String) -> Result<(), SdkError> {
+    pub async fn send_typing_user(&self, email: &str) -> Result<(), SdkError> {
         Msg::send_typing_user(&self.tr_id, &self.sb_tx, email).await
     }
 
     /// Requests the contact's display picture and handles the transfer process.
     pub async fn request_contact_display_picture(
         &self,
-        email: &String,
-        msn_object: &String,
+        email: &str,
+        msn_object: &str,
     ) -> Result<(), SdkError> {
         let user_email;
         {

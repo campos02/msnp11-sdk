@@ -11,7 +11,7 @@ pub(crate) enum InternalEvent {
     GotAuthorizationString(String),
     RedirectedTo {
         server: String,
-        port: String,
+        port: u16,
     },
 
     P2PInvite {

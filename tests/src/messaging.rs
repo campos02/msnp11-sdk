@@ -2,25 +2,27 @@
 async fn create_session() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
-    let mut client = msnp11_sdk::client::Client::new("127.0.0.1".to_string(), "1863".to_string())
+    let mut client = msnp11_sdk::client::Client::new("127.0.0.1", &1863)
         .await
         .unwrap();
 
     let result: msnp11_sdk::enums::event::Event = match client
         .login(
             "testing@example.com".to_string(),
-            "123456".to_string(),
-            "http://localhost:3000/rdr/pprdr.asp".to_string(),
+            "123456",
+            "http://localhost:3000/rdr/pprdr.asp",
         )
         .await
     {
         Ok(msnp11_sdk::enums::event::Event::RedirectedTo { server, port }) => {
-            client = msnp11_sdk::client::Client::new(server, port).await.unwrap();
+            client = msnp11_sdk::client::Client::new(&*server, &port)
+                .await
+                .unwrap();
             client
                 .login(
                     "testing@example.com".to_string(),
-                    "123456".to_string(),
-                    "http://localhost:3000/rdr/pprdr.asp".to_string(),
+                    "123456",
+                    "http://localhost:3000/rdr/pprdr.asp",
                 )
                 .await
                 .unwrap()
@@ -88,25 +90,27 @@ async fn create_session() {
 async fn join_session() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
-    let mut client = msnp11_sdk::client::Client::new("127.0.0.1".to_string(), "1863".to_string())
+    let mut client = msnp11_sdk::client::Client::new("127.0.0.1", &1863)
         .await
         .unwrap();
 
     let result: msnp11_sdk::enums::event::Event = match client
         .login(
             "testing@example.com".to_string(),
-            "123456".to_string(),
-            "http://localhost:3000/rdr/pprdr.asp".to_string(),
+            "123456",
+            "http://localhost:3000/rdr/pprdr.asp",
         )
         .await
     {
         Ok(msnp11_sdk::enums::event::Event::RedirectedTo { server, port }) => {
-            client = msnp11_sdk::client::Client::new(server, port).await.unwrap();
+            client = msnp11_sdk::client::Client::new(&*server, &port)
+                .await
+                .unwrap();
             client
                 .login(
                     "testing@example.com".to_string(),
-                    "123456".to_string(),
-                    "http://localhost:3000/rdr/pprdr.asp".to_string(),
+                    "123456",
+                    "http://localhost:3000/rdr/pprdr.asp",
                 )
                 .await
                 .unwrap()

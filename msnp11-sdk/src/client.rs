@@ -51,7 +51,7 @@ pub struct Client {
 
 impl Client {
     /// Connects to the server, defines the channels and returns a new instance.
-    pub async fn new(server: String, port: String) -> Result<Self, SdkError> {
+    pub async fn new(server: &str, port: &u16) -> Result<Self, SdkError> {
         let server_ip = lookup_host(format!("{server}:{port}"))
             .await
             .or(Err(SdkError::ResolutionError))?
@@ -66,7 +66,7 @@ impl Client {
 
         let socket = TcpStream::connect(format!("{server_ip}:{port}"))
             .await
-            .or(Err(SdkError::CouldNotConnectToServer))?;
+            .expect("Couldn't connect to server");
 
         let (mut rd, mut wr) = socket.into_split();
 
@@ -232,8 +232,8 @@ impl Client {
     pub async fn login(
         &self,
         email: String,
-        password: String,
-        nexus_url: String,
+        password: &str,
+        nexus_url: &str,
     ) -> Result<Event, SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
 
@@ -252,7 +252,7 @@ impl Client {
 
         let auth = PassportAuth::new(nexus_url);
         let token = auth
-            .get_passport_token(&email, password, authorization_string)
+            .get_passport_token(&email, password, &authorization_string)
             .await?;
 
         UsrS::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &token).await?;
@@ -302,7 +302,7 @@ impl Client {
     }
 
     /// Sets the user's display name.
-    pub async fn set_display_name(&self, display_name: &String) -> Result<(), SdkError> {
+    pub async fn set_display_name(&self, display_name: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         Prp::send(&self.tr_id, &self.ns_tx, &mut internal_rx, display_name).await
     }
@@ -310,8 +310,8 @@ impl Client {
     /// Sets a contact's display name.
     pub async fn set_contact_display_name(
         &self,
-        guid: &String,
-        display_name: &String,
+        guid: &str,
+        display_name: &str,
     ) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         Sbp::send(

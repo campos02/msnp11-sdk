@@ -2,13 +2,13 @@ use crate::sdk_error::SdkError;
 use reqwest::header::{AUTHORIZATION, HeaderMap};
 use std::error::Error;
 
-pub struct PassportAuth {
+pub struct PassportAuth<'a> {
     client: reqwest::Client,
-    nexus_url: String,
+    nexus_url: &'a str,
 }
 
-impl PassportAuth {
-    pub fn new(nexus_url: String) -> Self {
+impl<'a> PassportAuth<'a> {
+    pub fn new(nexus_url: &'a str) -> Self {
         Self {
             client: reqwest::Client::new(),
             nexus_url,
@@ -16,7 +16,7 @@ impl PassportAuth {
     }
 
     async fn get_login_srf(&self) -> Result<String, Box<dyn Error>> {
-        let response = self.client.get(&self.nexus_url).send().await?;
+        let response = self.client.get(self.nexus_url).send().await?;
         let mut url = response
             .headers()
             .get("Passporturls")
@@ -33,9 +33,9 @@ impl PassportAuth {
 
     pub async fn get_passport_token(
         &self,
-        email: &String,
-        password: String,
-        authorization_string: String,
+        email: &str,
+        password: &str,
+        authorization_string: &str,
     ) -> Result<String, SdkError> {
         let login_srf = self
             .get_login_srf()

@@ -9,7 +9,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum Event {
     /// The Dispatch Server replied with a command asking to connect to another server.
-    RedirectedTo { server: String, port: String },
+    RedirectedTo { server: String, port: u16 },
 
     /// Authenticated successfully.
     Authenticated,
