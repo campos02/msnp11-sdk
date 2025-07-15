@@ -34,7 +34,7 @@ impl Chg {
         if let Some(msn_object) = &presence.msn_object {
             command = command.replace(
                 "\r\n",
-                format!(" {}\r\n", urlencoding::encode(msn_object).to_string()).as_str(),
+                format!(" {}\r\n", urlencoding::encode(msn_object)).as_str(),
             );
         }
 
@@ -61,7 +61,7 @@ impl Chg {
 
                     "201" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 

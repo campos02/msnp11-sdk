@@ -31,14 +31,8 @@ impl Gtc {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
-                    "GTC" => {
-                        if args[1] == tr_id.to_string() && args[2] == gtc {
-                            return Ok(());
-                        }
-                    }
-
-                    _ => (),
+                if args[0] == "GTC" && args[1] == tr_id.to_string() && args[2] == gtc {
+                    return Ok(());
                 }
             }
         }

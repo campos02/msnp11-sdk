@@ -46,19 +46,19 @@ impl Sbp {
 
                     "201" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "208" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidContact.into());
+                            return Err(SdkError::InvalidContact);
                         }
                     }
 
                     "603" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::ServerError.into());
+                            return Err(SdkError::ServerError);
                         }
                     }
 

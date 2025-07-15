@@ -19,7 +19,7 @@ impl Rem {
         let tr_id = tr_id.load(Ordering::SeqCst);
 
         let list = match list {
-            MsnpList::ForwardList => return Err(SdkError::InvalidArgument.into()),
+            MsnpList::ForwardList => return Err(SdkError::InvalidArgument),
             MsnpList::AllowList => "AL",
             MsnpList::BlockList => "BL",
             MsnpList::ReverseList => "RL",
@@ -53,25 +53,25 @@ impl Rem {
 
                     "201" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "208" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidContact.into());
+                            return Err(SdkError::InvalidContact);
                         }
                     }
 
                     "216" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "603" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::ServerError.into());
+                            return Err(SdkError::ServerError);
                         }
                     }
 
@@ -117,25 +117,25 @@ impl Rem {
 
                     "201" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "208" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidContact.into());
+                            return Err(SdkError::InvalidContact);
                         }
                     }
 
                     "216" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "603" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::ServerError.into());
+                            return Err(SdkError::ServerError);
                         }
                     }
 
@@ -183,37 +183,37 @@ impl Rem {
 
                     "201" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "208" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidContact.into());
+                            return Err(SdkError::InvalidContact);
                         }
                     }
 
                     "216" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "224" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "225" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "603" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::ServerError.into());
+                            return Err(SdkError::ServerError);
                         }
                     }
 

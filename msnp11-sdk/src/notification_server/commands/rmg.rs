@@ -40,25 +40,25 @@ impl Rmg {
 
                     "224" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "226" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "230" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "603" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::ServerError.into());
+                            return Err(SdkError::ServerError);
                         }
                     }
 

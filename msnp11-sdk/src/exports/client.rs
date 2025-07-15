@@ -16,7 +16,7 @@ pub struct Client {
 impl Client {
     /// Connects to the server, defines the channels and returns a new instance.
     #[uniffi::constructor]
-    pub fn new(server: &String, port: &u16) -> Result<Self, SdkError> {
+    pub fn new(server: &str, port: &u16) -> Result<Self, SdkError> {
         let rt = Runtime::new().or(Err(SdkError::CouldNotCreateRuntime))?;
         let client = rt.block_on(async { crate::client::Client::new(server, port).await })?;
         Ok(Self { inner: client, rt })
@@ -28,7 +28,7 @@ impl Client {
             .block_on(async { self.inner.add_event_handler(handler) })
     }
 
-    /// Does the MSNP authentication process. Also starts regular pings and the handler for switchboard invitations.
+    /// Does the MSNP authentication process. Also starts regular pings and the handler for switchboard_server invitations.
     ///
     /// # Events
     /// If the server you're connecting to implements a Dispatch Server, then this will return a [RedirectedTo][Event::RedirectedTo] event.
@@ -58,15 +58,15 @@ impl Client {
     }
 
     /// Sets the user's display name.
-    pub async fn set_display_name(&self, display_name: &String) -> Result<(), SdkError> {
+    pub async fn set_display_name(&self, display_name: &str) -> Result<(), SdkError> {
         self.inner.set_display_name(display_name).await
     }
 
     /// Sets a contact's display name.
     pub async fn set_contact_display_name(
         &self,
-        guid: &String,
-        display_name: &String,
+        guid: &str,
+        display_name: &str,
     ) -> Result<(), SdkError> {
         self.inner
             .set_contact_display_name(guid, display_name)
@@ -105,7 +105,7 @@ impl Client {
     }
 
     /// Creates a new contact group.
-    pub async fn create_group(&self, name: &String) -> Result<(), SdkError> {
+    pub async fn create_group(&self, name: &str) -> Result<(), SdkError> {
         self.inner.create_group(name).await
     }
 
@@ -115,7 +115,7 @@ impl Client {
     }
 
     /// Renames a contact group.
-    pub async fn rename_group(&self, guid: &String, new_name: &String) -> Result<(), SdkError> {
+    pub async fn rename_group(&self, guid: &String, new_name: &str) -> Result<(), SdkError> {
         self.inner.rename_group(guid, new_name).await
     }
 
@@ -147,8 +147,8 @@ impl Client {
         self.inner.set_blp(blp).await
     }
 
-    /// Creates a new switchboard with the specified contact. Returns the created SB, which is used for messaging.
-    pub async fn create_session(&self, email: &String) -> Result<Switchboard, SdkError> {
+    /// Creates a new switchboard_server with the specified contact. Returns the created SB, which is used for messaging.
+    pub async fn create_session(&self, email: &str) -> Result<Switchboard, SdkError> {
         self.rt
             .block_on(async { self.inner.create_session(email).await })
     }

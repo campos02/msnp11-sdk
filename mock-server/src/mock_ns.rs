@@ -26,13 +26,13 @@ impl MockNS {
                     let mut messages: Vec<&[u8]> = Vec::new();
 
                     loop {
-                        let messages_string = unsafe { str::from_utf8_unchecked(&messages_bytes) };
+                        let messages_string = unsafe { str::from_utf8_unchecked(messages_bytes) };
                         let message_lines: Vec<String> = messages_string
                             .lines()
                             .map(|line| line.to_string() + "\r\n")
                             .collect();
 
-                        if message_lines.len() == 0 {
+                        if message_lines.is_empty() {
                             break;
                         }
 
@@ -120,7 +120,7 @@ impl MockNS {
 
                         for reply in replies {
                             trace!("S: {reply}");
-                            if wr.write_all(&reply.as_bytes()).await.is_err() {
+                            if wr.write_all(reply.as_bytes()).await.is_err() {
                                 error!("Error sending to client");
                             }
                         }

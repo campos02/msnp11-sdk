@@ -27,7 +27,7 @@ use crate::notification_server::event_matcher::{into_event, into_internal_event}
 use crate::passport_auth::PassportAuth;
 use crate::receive_split::receive_split;
 use crate::sdk_error::SdkError;
-use crate::switchboard::switchboard::Switchboard;
+use crate::switchboard_server::switchboard::Switchboard;
 use crate::user_data::UserData;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
@@ -124,14 +124,10 @@ impl Client {
                     trace!("S: {reply}");
 
                     let args: Vec<&str> = reply.trim().split(' ').collect();
-                    match args[0] {
-                        "QNG" => {
-                            let duration = args[1].parse().unwrap_or(50);
-                            tokio::time::sleep(Duration::from_secs(duration)).await;
-                            break;
-                        }
-
-                        _ => (),
+                    if args[0] == "QNG" {
+                        let duration = args[1].parse().unwrap_or(50);
+                        tokio::time::sleep(Duration::from_secs(duration)).await;
+                        break;
                     }
                 }
             }
@@ -163,32 +159,29 @@ impl Client {
 
         tokio::spawn(async move {
             while let Ok(event) = internal_rx.recv().await {
-                match event {
-                    InternalEvent::SwitchboardInvitation {
-                        server,
-                        port,
-                        session_id,
-                        cki_string,
-                    } => {
-                        let switchboard = Switchboard::new(
-                            server.as_str(),
-                            port.as_str(),
-                            cki_string.as_str(),
-                            user_data.clone(),
-                        )
-                        .await;
+                if let InternalEvent::SwitchboardInvitation {
+                    server,
+                    port,
+                    session_id,
+                    cki_string,
+                } = event
+                {
+                    let switchboard = Switchboard::new(
+                        server.as_str(),
+                        port.as_str(),
+                        cki_string.as_str(),
+                        user_data.clone(),
+                    )
+                    .await;
 
-                        if let Ok(switchboard) = switchboard {
-                            if switchboard.answer(&user_email, &session_id).await.is_ok() {
-                                event_tx
-                                    .send(Event::SessionAnswered(Arc::new(switchboard)))
-                                    .await
-                                    .expect("Could not send invitation event to channel");
-                            }
+                    if let Ok(switchboard) = switchboard {
+                        if switchboard.answer(&user_email, &session_id).await.is_ok() {
+                            event_tx
+                                .send(Event::SessionAnswered(Arc::new(switchboard)))
+                                .await
+                                .expect("Could not send invitation event to channel");
                         }
                     }
-
-                    _ => (),
                 }
             }
         });
@@ -224,7 +217,7 @@ impl Client {
         });
     }
 
-    /// Does the MSNP authentication process. Also starts regular pings and the handler for switchboard invitations.
+    /// Does the MSNP authentication process. Also starts regular pings and the handler for switchboard_server invitations.
     ///
     /// # Events
     /// If the server you're connecting to implements a Dispatch Server, then this will return a [RedirectedTo][Event::RedirectedTo] event.
@@ -248,7 +241,7 @@ impl Client {
                     return Ok(Event::RedirectedTo { server, port });
                 }
 
-                _ => return Err(SdkError::CouldNotGetAuthenticationString.into()),
+                _ => return Err(SdkError::CouldNotGetAuthenticationString),
             };
 
         let auth = PassportAuth::new(nexus_url);
@@ -404,7 +397,7 @@ impl Client {
     }
 
     /// Creates a new contact group.
-    pub async fn create_group(&self, name: &String) -> Result<(), SdkError> {
+    pub async fn create_group(&self, name: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         Adg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, name).await
     }
@@ -416,7 +409,7 @@ impl Client {
     }
 
     /// Renames a contact group.
-    pub async fn rename_group(&self, guid: &String, new_name: &String) -> Result<(), SdkError> {
+    pub async fn rename_group(&self, guid: &String, new_name: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         Reg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, new_name).await
     }
@@ -453,8 +446,8 @@ impl Client {
         Blp::send(&self.tr_id, &self.ns_tx, &mut internal_rx, blp).await
     }
 
-    /// Creates a new switchboard with the specified contact. Returns the created SB, which is used for messaging.
-    pub async fn create_session(&self, email: &String) -> Result<Switchboard, SdkError> {
+    /// Creates a new switchboard_server with the specified contact. Returns the created SB, which is used for messaging.
+    pub async fn create_session(&self, email: &str) -> Result<Switchboard, SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         let user_email;
         {

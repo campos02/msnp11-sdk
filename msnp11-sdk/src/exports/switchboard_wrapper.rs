@@ -4,8 +4,8 @@ use crate::{PlainText, Switchboard};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-/// Wraps an obtained [Switchboard][crate::switchboard::switchboard::Switchboard] object for use outside a tokio main.
-/// [Switchboard][crate::switchboard::switchboard::Switchboard] represents a messaging session with one or more
+/// Wraps an obtained [Switchboard][crate::switchboard_server::switchboard_server::Switchboard] object for use outside a tokio main.
+/// [Switchboard][crate::switchboard_server::switchboard_server::Switchboard] represents a messaging session with one or more
 /// contacts. The official MSNP clients usually create a new session every time a conversation
 /// window is opened and leave it when it's closed.
 #[derive(uniffi::Object)]
@@ -16,7 +16,7 @@ pub struct SwitchboardWrapper {
 
 #[uniffi::export]
 impl SwitchboardWrapper {
-    /// Create new wrapper instance with an obtained [Switchboard][crate::switchboard::switchboard::Switchboard].
+    /// Create new wrapper instance with an obtained [Switchboard][crate::switchboard_server::switchboard_server::Switchboard].
     #[uniffi::constructor]
     pub fn new(switchboard: Arc<Switchboard>) -> Result<Self, SdkError> {
         let rt = Runtime::new().or(Err(SdkError::CouldNotCreateRuntime))?;
@@ -32,8 +32,8 @@ impl SwitchboardWrapper {
             .block_on(async { self.inner.add_event_handler(handler) })
     }
 
-    /// Invites a new contact to this switchboard session. This makes them temporary chat rooms.
-    pub async fn invite(&self, email: &String) -> Result<(), SdkError> {
+    /// Invites a new contact to this switchboard_server session. This makes them temporary chat rooms.
+    pub async fn invite(&self, email: &str) -> Result<(), SdkError> {
         self.inner.invite(email).await
     }
 
@@ -53,15 +53,15 @@ impl SwitchboardWrapper {
     }
 
     /// Sends an "is writing..." notification to the session.
-    pub async fn send_typing_user(&self, email: &String) -> Result<(), SdkError> {
+    pub async fn send_typing_user(&self, email: &str) -> Result<(), SdkError> {
         self.inner.send_typing_user(email).await
     }
 
     /// Requests the contact's display picture and handles the transfer process.
     pub async fn request_contact_display_picture(
         &self,
-        email: &String,
-        msn_object: &String,
+        email: &str,
+        msn_object: &str,
     ) -> Result<(), SdkError> {
         self.inner
             .request_contact_display_picture(email, msn_object)

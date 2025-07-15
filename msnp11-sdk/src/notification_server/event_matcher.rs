@@ -187,10 +187,8 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
         }
 
         "OUT" => {
-            if args.len() > 1 {
-                if args[1] == "OTH" {
-                    return Some(Event::LoggedInAnotherDevice);
-                }
+            if args.len() > 1 && args[1] == "OTH" {
+                return Some(Event::LoggedInAnotherDevice);
             }
 
             Some(Event::Disconnected)

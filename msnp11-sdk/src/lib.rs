@@ -56,7 +56,7 @@ mod notification_server;
 mod passport_auth;
 mod receive_split;
 pub mod sdk_error;
-pub mod switchboard;
+pub mod switchboard_server;
 mod user_data;
 
 uniffi::setup_scaffolding!();
@@ -68,4 +68,4 @@ pub use enums::msnp_status::MsnpStatus;
 pub use models::personal_message::PersonalMessage;
 pub use models::plain_text::PlainText;
 pub use models::presence::Presence;
-pub use switchboard::switchboard::Switchboard;
+pub use switchboard_server::switchboard::Switchboard;

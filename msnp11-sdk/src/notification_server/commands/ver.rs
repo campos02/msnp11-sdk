@@ -30,18 +30,12 @@ impl Ver {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
-                    "VER" => {
-                        if args[1] == tr_id.to_string() {
-                            return if args[2] != "MSNP11" {
-                                Err(SdkError::ProtocolNotSupported.into())
-                            } else {
-                                Ok(())
-                            };
-                        }
-                    }
-
-                    _ => (),
+                if args[0] == "VER" && args[1] == tr_id.to_string() {
+                    return if args[2] != "MSNP11" {
+                        Err(SdkError::ProtocolNotSupported)
+                    } else {
+                        Ok(())
+                    };
                 }
             }
         }

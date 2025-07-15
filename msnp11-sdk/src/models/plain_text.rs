@@ -26,7 +26,7 @@ impl PlainText {
         let mut color = im_format[2].replace("CO=", "").trim().to_string();
 
         while color.len() < 6 {
-            color.insert_str(0, "0");
+            color.insert(0, '0');
         }
 
         // MSN uses BGR... just why
@@ -66,24 +66,24 @@ impl PlainText {
         message.push_str("X-MMS-IM-Format: FN=Microsoft%20Sans%20Serif; EF=");
 
         if self.bold {
-            message.push_str("B");
+            message.push('B');
         }
 
         if self.italic {
-            message.push_str("I");
+            message.push('I');
         }
 
         if self.underline {
-            message.push_str("U");
+            message.push('U');
         }
 
         if self.strikethrough {
-            message.push_str("S");
+            message.push('S');
         }
 
         let mut color = self.color.trim().replace("#", "");
         while color.len() < 6 {
-            color.insert_str(0, "0");
+            color.insert(0, '0');
         }
 
         // MSN uses BGR... just why

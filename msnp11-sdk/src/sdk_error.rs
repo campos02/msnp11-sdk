@@ -104,7 +104,7 @@ impl fmt::Display for SdkError {
             SdkError::TransmittingError => write!(f, "Error transmitting data"),
 
             SdkError::CouldNotSetSessionId => {
-                write!(f, "Could not set session ID from switchboard")
+                write!(f, "Could not set session ID from switchboard_server")
             }
 
             SdkError::CouldNotGetSessionId => {

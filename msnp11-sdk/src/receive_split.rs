@@ -21,7 +21,7 @@ pub(crate) async fn receive_split(rd: &mut OwnedReadHalf) -> Result<Vec<Vec<u8>>
             .map(|line| line.to_string() + "\r\n")
             .collect();
 
-        if message_lines.len() == 0 {
+        if message_lines.is_empty() {
             break;
         }
 

@@ -1,7 +1,7 @@
 use crate::enums::event::Event;
 use crate::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
-use crate::switchboard::p2p::binary_header::BinaryHeader;
+use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 use core::str;
 use deku::DekuContainerRead;
 use std::io::Cursor;
@@ -23,9 +23,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
             }
 
             let payload = reply.replace(command.as_str(), "");
-            let Some(content_type) = payload.lines().nth(1) else {
-                return None;
-            };
+            let content_type = payload.lines().nth(1)?;
 
             if content_type.contains("text/plain") {
                 return Some(Event::TextMessage {
@@ -44,10 +42,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
             }
 
             if content_type.contains("text/x-msmsgscontrol") {
-                let Some(typing_user) = payload.lines().nth(2) else {
-                    return None;
-                };
-
+                let typing_user = payload.lines().nth(2)?;
                 return Some(Event::TypingNotification {
                     email: typing_user.replace("TypingUser: ", ""),
                 });

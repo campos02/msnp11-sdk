@@ -40,7 +40,7 @@ impl UsrS {
 
                     "911" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::ServerIsBusy.into());
+                            return Err(SdkError::ServerIsBusy);
                         }
                     }
 

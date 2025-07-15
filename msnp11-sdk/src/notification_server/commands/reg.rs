@@ -12,7 +12,7 @@ impl Reg {
         ns_tx: &mpsc::Sender<Vec<u8>>,
         internal_rx: &mut broadcast::Receiver<InternalEvent>,
         guid: &String,
-        new_name: &String,
+        new_name: &str,
     ) -> Result<(), SdkError> {
         tr_id.fetch_add(1, Ordering::SeqCst);
         let tr_id = tr_id.load(Ordering::SeqCst);
@@ -42,19 +42,19 @@ impl Reg {
 
                     "224" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "228" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument.into());
+                            return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "603" => {
                         if args[1] == tr_id.to_string() {
-                            return Err(SdkError::ServerError.into());
+                            return Err(SdkError::ServerError);
                         }
                     }
 

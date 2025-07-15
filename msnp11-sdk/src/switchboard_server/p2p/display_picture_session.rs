@@ -1,5 +1,5 @@
 use crate::sdk_error::SdkError;
-use crate::switchboard::p2p::binary_header::BinaryHeader;
+use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::{DekuContainerRead, DekuContainerWrite};
@@ -59,7 +59,7 @@ impl DisplayPictureSession {
         let call_id = guid_create::GUID::rand().to_string();
         let session_id = rng().next_u32();
 
-        let mut body = format!("EUF-GUID: {{A4268EEC-FEC5-49E5-95C3-F126696BDBF6}}\r\n");
+        let mut body = "EUF-GUID: {A4268EEC-FEC5-49E5-95C3-F126696BDBF6}\r\n".to_string();
         body.push_str(format!("SessionID: {session_id}\r\n").as_str());
         body.push_str("AppID: 1\r\n");
         body.push_str(
@@ -129,7 +129,7 @@ impl DisplayPictureSession {
     }
 
     pub fn ok(&self, to: &str, from: &str) -> Result<Vec<u8>, Box<dyn Error>> {
-        let mut body = format!("EUF-GUID: {{A4268EEC-FEC5-49E5-95C3-F126696BDBF6}}\r\n");
+        let mut body = "EUF-GUID: {A4268EEC-FEC5-49E5-95C3-F126696BDBF6}\r\n".to_string();
         body.push_str(format!("SessionID: {}\r\n\r\n\0", self.session_id).as_str());
 
         let mut headers = "MSNSLP/1.0 200 OK\r\n".to_string();
@@ -181,13 +181,13 @@ impl DisplayPictureSession {
         Ok(data_preparation)
     }
 
-    pub fn data(&self, data: &Vec<u8>) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
+    pub fn data(&self, data: &[u8]) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
         let mut payloads: Vec<Vec<u8>> = Vec::new();
         let total_data_size = data.len() as u64;
         let mut data_offset = 0u64;
 
-        let mut chunks = data.chunks(1202);
-        while let Some(chunk) = chunks.next() {
+        let chunks = data.chunks(1202);
+        for chunk in chunks {
             let mut data_message = BinaryHeader {
                 session_id: self.session_id,
                 identifier: self.base_identifier + 3,

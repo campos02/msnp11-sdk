@@ -30,14 +30,8 @@ impl Gcf {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
-                    "GCF" => {
-                        if args[1] == tr_id.to_string() {
-                            return Ok(());
-                        }
-                    }
-
-                    _ => (),
+                if args[0] == "GCF" && args[1] == tr_id.to_string() {
+                    return Ok(());
                 }
             }
         }

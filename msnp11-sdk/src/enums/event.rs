@@ -2,7 +2,7 @@ use crate::enums::msnp_list::MsnpList;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::plain_text::PlainText;
 use crate::models::presence::Presence;
-use crate::switchboard::switchboard::Switchboard;
+use crate::switchboard_server::switchboard::Switchboard;
 use std::sync::Arc;
 
 /// Contact and messaging events returned.
@@ -61,7 +61,7 @@ pub enum Event {
     /// Removed from someone's forward list.
     RemovedBy(String),
 
-    /// An invitation to a switchboard session was accepted.
+    /// An invitation to a switchboard_server session was accepted.
     SessionAnswered(Arc<Switchboard>),
 
     /// New text message.
@@ -73,10 +73,10 @@ pub enum Event {
     /// Contact is writing...
     TypingNotification { email: String },
 
-    /// New user joined the switchboard.
+    /// New user joined the switchboard_server.
     ParticipantInSwitchboard { email: String },
 
-    /// A user left the switchboard.
+    /// A user left the switchboard_server.
     ParticipantLeftSwitchboard { email: String },
 
     /// A contact's display picture.
