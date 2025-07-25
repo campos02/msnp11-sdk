@@ -1,4 +1,4 @@
-//! An MSNP11 client SDK. Still a WIP, but messaging and some contact actions have tests that confirm they're working.
+//! An MSNP11 client SDK.
 //! # Login
 //! ```
 //! use msnp11_sdk::client::Client;

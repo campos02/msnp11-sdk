@@ -1,6 +1,6 @@
 use crate::event_handler::EventHandler;
 use crate::sdk_error::SdkError;
-use crate::{PlainText, Switchboard};
+use crate::{MsnObject, PlainText, Switchboard};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -61,7 +61,7 @@ impl SwitchboardWrapper {
     pub async fn request_contact_display_picture(
         &self,
         email: &str,
-        msn_object: &str,
+        msn_object: &MsnObject,
     ) -> Result<(), SdkError> {
         self.inner
             .request_contact_display_picture(email, msn_object)

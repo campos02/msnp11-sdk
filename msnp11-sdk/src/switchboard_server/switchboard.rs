@@ -24,6 +24,7 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc};
+use crate::MsnObject;
 
 /// Represents a messaging session with one or more contacts. The official MSNP clients usually create a new session every time a conversation
 /// window is opened and leave it when it's closed.
@@ -402,8 +403,9 @@ impl Switchboard {
     pub async fn request_contact_display_picture(
         &self,
         email: &str,
-        msn_object: &str,
+        msn_object: &MsnObject,
     ) -> Result<(), SdkError> {
+        let msn_object = quick_xml::se::to_string(&msn_object).or(Err(SdkError::InvalidArgument))?;
         let user_email;
         {
             let user_data = self
@@ -421,7 +423,7 @@ impl Switchboard {
         let mut internal_rx = self.internal_tx.subscribe();
         let mut command_internal_rx = self.internal_tx.subscribe();
         let mut session = DisplayPictureSession::new();
-        let invite = session.invite(email, &user_email, msn_object)?;
+        let invite = session.invite(email, &user_email, &msn_object)?;
 
         Msg::send_p2p(
             &self.tr_id,
