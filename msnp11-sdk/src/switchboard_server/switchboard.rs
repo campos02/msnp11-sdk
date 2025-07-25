@@ -505,7 +505,7 @@ impl Switchboard {
             }
 
             // Introduce some delay so all chunks are received
-            tokio::time::sleep(Duration::from_millis(150)).await;
+            tokio::time::sleep(Duration::from_millis(200)).await;
         }
 
         let bye = session.bye(email, &user_email)?;

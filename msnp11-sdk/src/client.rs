@@ -51,8 +51,8 @@ pub struct Client {
 
 impl Client {
     /// Connects to the server, defines the channels and returns a new instance.
-    pub async fn new(server: &str, port: &u16) -> Result<Self, SdkError> {
-        let mut server_ips = lookup_host((server, *port))
+    pub async fn new(server: &str, port: u16) -> Result<Self, SdkError> {
+        let mut server_ips = lookup_host((server, port))
             .await
             .or(Err(SdkError::ResolutionError))?;
 
@@ -65,7 +65,7 @@ impl Client {
         let (ns_tx, mut ns_rx) = mpsc::channel::<Vec<u8>>(16);
         let (internal_tx, _) = broadcast::channel::<InternalEvent>(64);
 
-        let socket = TcpStream::connect((server_ip, *port))
+        let socket = TcpStream::connect((server_ip, port))
             .await
             .expect("Couldn't connect to the server");
 
@@ -228,11 +228,21 @@ impl Client {
         email: String,
         password: &str,
         nexus_url: &str,
+        client_name: &str,
+        version: &str,
     ) -> Result<Event, SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
 
         Ver::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
-        Cvr::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &email).await?;
+        Cvr::send(
+            &self.tr_id,
+            &self.ns_tx,
+            &mut internal_rx,
+            &email,
+            client_name,
+            version,
+        )
+        .await?;
 
         let authorization_string =
             match UsrI::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &email).await? {

@@ -12,12 +12,14 @@ impl Cvr {
         ns_tx: &mpsc::Sender<Vec<u8>>,
         internal_rx: &mut broadcast::Receiver<InternalEvent>,
         email: &str,
+        client_name: &str,
+        version: &str,
     ) -> Result<(), SdkError> {
         tr_id.fetch_add(1, Ordering::SeqCst);
         let tr_id = tr_id.load(Ordering::SeqCst);
 
         let command =
-            format!("CVR {tr_id} 0x0409 winnt 10 i386 msnp11-sdk 0.01 msmsgs {email}\r\n");
+            format!("CVR {tr_id} 0x0409 winnt 10 i386 {client_name} {version} msmsgs {email}\r\n");
 
         ns_tx
             .send(command.as_bytes().to_vec())

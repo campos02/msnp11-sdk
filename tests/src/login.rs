@@ -2,7 +2,7 @@
 async fn login() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
 
-    let mut client = msnp11_sdk::client::Client::new(&"127.0.0.1".to_string(), &1863)
+    let mut client = msnp11_sdk::client::Client::new(&"127.0.0.1".to_string(), 1863)
         .await
         .unwrap();
 
@@ -11,10 +11,12 @@ async fn login() {
             "testing@example.com".to_string(),
             "123456",
             "http://localhost:3000/rdr/pprdr.asp",
+            "msnp11-sdk",
+            "0.6",
         )
         .await
     {
-        client = msnp11_sdk::client::Client::new(&server, &port)
+        client = msnp11_sdk::client::Client::new(&server, port)
             .await
             .unwrap();
         client
@@ -22,6 +24,8 @@ async fn login() {
                 "testing@example.com".to_string(),
                 "123456",
                 "http://localhost:3000/rdr/pprdr.asp",
+                "msnp11-sdk",
+                "0.6",
             )
             .await
             .unwrap();

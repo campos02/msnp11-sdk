@@ -16,7 +16,7 @@ pub struct Client {
 impl Client {
     /// Connects to the server, defines the channels and returns a new instance.
     #[uniffi::constructor]
-    pub fn new(server: &str, port: &u16) -> Result<Self, SdkError> {
+    pub fn new(server: &str, port: u16) -> Result<Self, SdkError> {
         let rt = Runtime::new().or(Err(SdkError::CouldNotCreateRuntime))?;
         let client = rt.block_on(async { crate::client::Client::new(server, port).await })?;
         Ok(Self { inner: client, rt })
@@ -39,9 +39,14 @@ impl Client {
         email: String,
         password: &str,
         nexus_url: &str,
+        client_name: &str,
+        version: &str,
     ) -> Result<Event, SdkError> {
-        self.rt
-            .block_on(async { self.inner.login(email, password, nexus_url).await })
+        self.rt.block_on(async {
+            self.inner
+                .login(email, password, nexus_url, client_name, version)
+                .await
+        })
     }
 
     /// Sets the user's presence status.

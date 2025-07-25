@@ -6,7 +6,7 @@
 //! use msnp11_sdk::models::personal_message::PersonalMessage;
 //! use msnp11_sdk::enums::msnp_status::MsnpStatus;
 //!
-//! let mut client = Client::new("127.0.0.1", &1863)
+//! let mut client = Client::new("127.0.0.1", 1863)
 //!    .await
 //!    .unwrap();
 //!
@@ -18,15 +18,19 @@
 //!         "testing@example.com".to_string(),
 //!         "123456",
 //!         "http://localhost:3000/rdr/pprdr.asp",
+//!         "msnp11-sdk",
+//!         "0.6"
 //!     )
 //!     .await
 //!  {
-//!     client = Client::new(&*server, &port).await.unwrap();
+//!     client = Client::new(&*server, port).await.unwrap();
 //!     client
 //!         .login(
 //!             "testing@example.com".to_string(),
 //!             "123456",
 //!             "http://localhost:3000/rdr/pprdr.asp",
+//!             "msnp11-sdk",
+//!             "0.6"
 //!         )
 //!         .await
 //!         .unwrap();
