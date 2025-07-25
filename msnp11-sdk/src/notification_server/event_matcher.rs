@@ -142,7 +142,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
                 presence: Presence {
                     status,
                     client_id: args[base_index + 4].to_string().parse().unwrap_or(0),
-                    msn_object,
+                    msn_object: quick_xml::de::from_str(&msn_object.unwrap_or_default()).ok(),
                 },
             })
         }

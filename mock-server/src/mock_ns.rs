@@ -61,7 +61,7 @@ impl MockNS {
 
                         let replies: &[&str] = match message {
                             "VER 1 MSNP11 CVR0\r\n" => &["VER 1 MSNP11\r\n"],
-                            "CVR 2 0x0409 winnt 10 i386 msnp11-sdk 0.01 msmsgs testing@example.com\r\n" => {
+                            "CVR 2 0x0409 winnt 10 i386 msnp11-sdk 0.6 msmsgs testing@example.com\r\n" => {
                                 &["CVR 2 1.0.0000 1.0.0000 7.0.0425\r\n"]
                             }
 
@@ -89,8 +89,8 @@ impl MockNS {
 
                             "CHG 7 NLN 1073741824\r\n" => &[
                                 "CHG 7 NLN 1073741824\r\n",
-                                "ILN 7 NLN bob@passport.com Bob 1073741824 %3Cmsnobj%20Creator%3D%22\r\n",
-                                "NLN NLN bob@passport.com Bob 1073741824 %3Cmsnobj%20Creator%3D%22\r\n",
+                                "ILN 7 NLN bob@passport.com Bob 1073741824 %3Cmsnobj%20Creator%3D%22bob%40passport.com%22%20Size%3D%2222731%22%20Type%3D%223%22%20Location%3D%22TFRDDF.dat%22%20Friendly%3D%22AAA%3D%22%20SHA1D%3D%22G8fPpR6aONX286a8C2cFmeVbPsA%3D%22%20SHA1C%3D%22GBEWvLqBa1B6mBfFDavq%2BU0FRmk%3D%22%2F%3E\r\n",
+                                "NLN NLN bob@passport.com Bob 1073741824 %3Cmsnobj%20Creator%3D%22bob%40passport.com%22%20Size%3D%2222731%22%20Type%3D%223%22%20Location%3D%22TFRDDF.dat%22%20Friendly%3D%22AAA%3D%22%20SHA1D%3D%22G8fPpR6aONX286a8C2cFmeVbPsA%3D%22%20SHA1C%3D%22GBEWvLqBa1B6mBfFDavq%2BU0FRmk%3D%22%2F%3E\r\n",
                                 "UBX bob@passport.com 70\r\n<Data><PSM>my msn all ducked</PSM><CurrentMedia></CurrentMedia></Data>",
                             ],
 

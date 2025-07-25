@@ -31,10 +31,12 @@ impl Chg {
 
         let mut command = format!("CHG {tr_id} {status} {}\r\n", presence.client_id);
 
-        if let Some(msn_object) = &presence.msn_object {
+        if let Some(msn_object) = &presence.msn_object
+            && let Ok(msn_object) = quick_xml::se::to_string(msn_object)
+        {
             command = command.replace(
                 "\r\n",
-                format!(" {}\r\n", urlencoding::encode(msn_object)).as_str(),
+                format!(" {}\r\n", urlencoding::encode(&msn_object)).as_str(),
             );
         }
 

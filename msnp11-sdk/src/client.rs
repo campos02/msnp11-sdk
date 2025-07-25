@@ -292,7 +292,11 @@ impl Client {
         }
         let mut internal_rx = self.internal_tx.subscribe();
 
-        let presence = Presence::new(presence, msn_object);
+        let presence = Presence::new(
+            presence,
+            quick_xml::de::from_str(&msn_object.unwrap_or_default()).ok(),
+        );
+
         Chg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &presence).await
     }
 

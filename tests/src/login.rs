@@ -35,6 +35,7 @@ async fn login() {
         .set_presence(msnp11_sdk::enums::msnp_status::MsnpStatus::Online)
         .await
         .unwrap();
+
     client
         .set_personal_message(&msnp11_sdk::models::personal_message::PersonalMessage {
             psm: "test".to_string(),
@@ -97,14 +98,9 @@ async fn login() {
             } => {
                 assert_eq!(email, "bob@passport.com");
                 assert_eq!(display_name, "Bob");
-                assert_eq!(
-                    presence,
-                    msnp11_sdk::models::presence::Presence {
-                        status: msnp11_sdk::enums::msnp_status::MsnpStatus::Online,
-                        client_id: 1073741824,
-                        msn_object: Some("<msnobj Creator=\"".to_string())
-                    }
-                );
+                assert_eq!(presence.msn_object.as_ref().unwrap().creator, email);
+                assert_eq!(presence.msn_object.as_ref().unwrap().size, 22731);
+                assert_eq!(presence.msn_object.as_ref().unwrap().object_type, 3);
             }
 
             msnp11_sdk::enums::event::Event::PersonalMessageUpdate {
