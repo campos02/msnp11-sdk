@@ -1,3 +1,4 @@
+use crate::MsnObject;
 use crate::enums::event::Event;
 use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
@@ -24,7 +25,6 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc};
-use crate::MsnObject;
 
 /// Represents a messaging session with one or more contacts. The official MSNP clients usually create a new session every time a conversation
 /// window is opened and leave it when it's closed.
@@ -102,6 +102,7 @@ impl Switchboard {
         let sb_tx = self.sb_tx.clone();
         let mut internal_rx = self.internal_tx.subscribe();
         let mut command_internal_rx = self.internal_tx.subscribe();
+
         let tr_id = self.tr_id.clone();
         let user_data;
         {
@@ -405,7 +406,9 @@ impl Switchboard {
         email: &str,
         msn_object: &MsnObject,
     ) -> Result<(), SdkError> {
-        let msn_object = quick_xml::se::to_string(&msn_object).or(Err(SdkError::InvalidArgument))?;
+        let msn_object =
+            quick_xml::se::to_string(&msn_object).or(Err(SdkError::InvalidArgument))?;
+
         let user_email;
         {
             let user_data = self
@@ -422,6 +425,7 @@ impl Switchboard {
 
         let mut internal_rx = self.internal_tx.subscribe();
         let mut command_internal_rx = self.internal_tx.subscribe();
+
         let mut session = DisplayPictureSession::new();
         let invite = session.invite(email, &user_email, &msn_object)?;
 
@@ -535,9 +539,13 @@ impl Switchboard {
     pub async fn disconnect(&self) -> Result<(), SdkError> {
         let command = "OUT\r\n";
         trace!("C: {command}");
+
         self.sb_tx
             .send(command.as_bytes().to_vec())
             .await
-            .or(Err(SdkError::TransmittingError))
+            .or(Err(SdkError::TransmittingError))?;
+
+        self.event_tx.close();
+        Ok(())
     }
 }

@@ -82,7 +82,7 @@ pub enum Event {
     /// A contact's display picture.
     DisplayPicture { email: String, data: Vec<u8> },
 
-    /// Disconnected because the user logged in in another device.
+    /// Disconnected because the user logged in on another device.
     LoggedInAnotherDevice,
     /// Lost connection to the server.
     Disconnected,

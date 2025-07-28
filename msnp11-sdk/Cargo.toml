@@ -3,7 +3,7 @@ name = "msnp11-sdk"
 description = "An MSNP11 client SDK"
 repository = "https://github.com/campos02/msnp11-sdk"
 license = "MIT"
-version = "0.6.2"
+version = "0.6.3"
 edition = "2024"
 readme = "../README.md"
 

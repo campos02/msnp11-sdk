@@ -83,10 +83,17 @@ impl Client {
 
                     let event = into_event(&message);
                     if let Some(event) = event {
+                        let disconnected =
+                            matches!(event, Event::Disconnected | Event::LoggedInAnotherDevice);
+
                         event_task_tx
                             .send(event)
                             .await
                             .expect("Error sending event to channel");
+
+                        if disconnected {
+                            event_task_tx.close();
+                        }
                     }
                 }
             }
@@ -142,6 +149,7 @@ impl Client {
     async fn handle_switchboard_invitations(&self) -> Result<(), SdkError> {
         let event_tx = self.event_tx.clone();
         let mut internal_rx = self.internal_tx.subscribe();
+
         let user_data = self.user_data.clone();
         let user_email;
         {
@@ -526,9 +534,13 @@ impl Client {
     pub async fn disconnect(&self) -> Result<(), SdkError> {
         let command = "OUT\r\n";
         trace!("C: {command}");
+
         self.ns_tx
             .send(command.as_bytes().to_vec())
             .await
-            .or(Err(SdkError::TransmittingError))
+            .or(Err(SdkError::TransmittingError))?;
+
+        self.event_tx.close();
+        Ok(())
     }
 }
