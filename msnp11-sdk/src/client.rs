@@ -124,7 +124,7 @@ impl Client {
 
         tokio::spawn(async move {
             let command = "PNG\r\n";
-            while ns_tx.send(command.as_bytes().to_vec()).await.is_ok() {
+            'outer: while ns_tx.send(command.as_bytes().to_vec()).await.is_ok() {
                 trace!("C: {command}");
 
                 while let Ok(InternalEvent::ServerReply(reply)) = internal_rx.recv().await {
@@ -132,9 +132,15 @@ impl Client {
 
                     let args: Vec<&str> = reply.trim().split(' ').collect();
                     if args[0] == "QNG" {
-                        let duration = args[1].parse().unwrap_or(50);
-                        tokio::time::sleep(Duration::from_secs(duration)).await;
-                        break;
+                        // Parse and sanity check to avoid spamming the server
+                        if let Ok(duration) = args[1].parse()
+                            && duration > 10
+                        {
+                            tokio::time::sleep(Duration::from_secs(duration)).await;
+                            break;
+                        } else {
+                            break 'outer;
+                        }
                     }
                 }
             }

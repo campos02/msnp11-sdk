@@ -423,7 +423,7 @@ impl Switchboard {
         let mut command_internal_rx = self.internal_tx.subscribe();
 
         let mut session = DisplayPictureSession::new();
-        let invite = session.invite(email, &user_email, &msn_object)?;
+        let invite = session.invite(email, &user_email, msn_object)?;
 
         Msg::send_p2p(
             &self.tr_id,

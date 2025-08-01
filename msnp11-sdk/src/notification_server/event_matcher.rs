@@ -38,7 +38,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
             if args.len() < 4 && args[1] == "MFN" {
                 Some(Event::DisplayName(
                     urlencoding::decode(args[2])
-                        .expect("Could not url decode display name")
+                        .unwrap_or(Cow::from(args[2]))
                         .to_string(),
                 ))
             } else {
@@ -48,7 +48,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
 
         "LSG" => Some(Event::Group {
             name: urlencoding::decode(args[1])
-                .expect("Could not url decode group name")
+                .unwrap_or(Cow::from(args[1]))
                 .to_string(),
             guid: args[2].to_string(),
         }),
@@ -57,9 +57,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
             let mut lists: Vec<MsnpList> = Vec::new();
             let lists_number_index = if args.len() > 4 { 4 } else { 3 };
 
-            let lists_number = args[lists_number_index]
-                .parse::<u32>()
-                .expect("Found invalid list number");
+            let lists_number = args[lists_number_index].parse::<u32>().unwrap_or(1);
 
             if lists_number & 1 == 1 {
                 lists.push(MsnpList::ForwardList);
@@ -90,7 +88,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
                 Some(Event::ContactInForwardList {
                     email: args[1].replace("N=", ""),
                     display_name: urlencoding::decode(args[2].replace("F=", "").as_str())
-                        .expect("Could not url decode contact name")
+                        .unwrap_or(Cow::from(args[1]))
                         .to_string(),
                     guid: args[3].replace("C=", ""),
                     groups,
@@ -100,7 +98,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
                 Some(Event::Contact {
                     email: args[1].replace("N=", ""),
                     display_name: urlencoding::decode(args[2].replace("F=", "").as_str())
-                        .expect("Could not url decode contact name")
+                        .unwrap_or(Cow::from(args[1]))
                         .to_string(),
                     lists,
                 })
@@ -110,17 +108,9 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
         "NLN" | "ILN" => {
             let base_index = if args[0] == "ILN" { 1 } else { 0 };
             let msn_object = if args[0] == "ILN" && args.len() > 6 {
-                Some(
-                    urlencoding::decode(args[6])
-                        .expect("Could not url decode MSN object")
-                        .to_string(),
-                )
+                urlencoding::decode(args[6]).ok().map(String::from)
             } else if args[0] == "NLN" && args.len() > 5 {
-                Some(
-                    urlencoding::decode(args[5])
-                        .expect("Could not url decode MSN object")
-                        .to_string(),
-                )
+                urlencoding::decode(args[5]).ok().map(String::from)
             } else {
                 None
             };
@@ -176,7 +166,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
                 Some(Event::AddedBy {
                     email: args[3].replace("N=", ""),
                     display_name: urlencoding::decode(args[4].replace("F=", "").as_str())
-                        .expect("Could not url decode contact display name")
+                        .unwrap_or(Cow::from(args[3]))
                         .to_string(),
                 })
             } else {

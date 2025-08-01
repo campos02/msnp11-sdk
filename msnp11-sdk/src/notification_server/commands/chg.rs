@@ -33,7 +33,7 @@ impl Chg {
         if let Some(msn_object) = &presence.msn_object_string {
             command = command.replace(
                 "\r\n",
-                format!(" {}\r\n", urlencoding::encode(&msn_object)).as_str(),
+                format!(" {}\r\n", urlencoding::encode(msn_object)).as_str(),
             );
         }
 
