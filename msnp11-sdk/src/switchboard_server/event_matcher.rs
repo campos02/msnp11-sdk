@@ -101,7 +101,7 @@ pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
                     return InternalEvent::ServerReply(reply);
                 };
 
-                if binary_header.flag == 0x20 {
+                if binary_header.flag == 0x20 || binary_header.flag == 0x1000020 {
                     return InternalEvent::P2PData {
                         destination,
                         message: message[..(message.len() - 4)].to_vec(),
