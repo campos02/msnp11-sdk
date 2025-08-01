@@ -5,6 +5,7 @@ use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
 use core::str;
+use std::borrow::Cow;
 
 pub fn into_event(message: &Vec<u8>) -> Option<Event> {
     let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) };
@@ -137,12 +138,17 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
             Some(Event::PresenceUpdate {
                 email: args[base_index + 2].to_string(),
                 display_name: urlencoding::decode(args[base_index + 3])
-                    .expect("Could not url decode contact name")
+                    .unwrap_or(Cow::from(args[base_index + 2]))
                     .to_string(),
                 presence: Presence {
                     status,
                     client_id: args[base_index + 4].to_string().parse().unwrap_or(0),
-                    msn_object: quick_xml::de::from_str(&msn_object.unwrap_or_default()).ok(),
+                    msn_object: if let Some(msn_object) = &msn_object {
+                        quick_xml::de::from_str(msn_object).ok()
+                    } else {
+                        None
+                    },
+                    msn_object_string: msn_object,
                 },
             })
         }

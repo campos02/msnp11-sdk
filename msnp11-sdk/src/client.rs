@@ -67,7 +67,7 @@ impl Client {
 
         let socket = TcpStream::connect((server_ip, port))
             .await
-            .expect("Couldn't connect to the server");
+            .or(Err(SdkError::ServerError))?;
 
         let (mut rd, mut wr) = socket.into_split();
 
@@ -302,7 +302,12 @@ impl Client {
 
         let presence = Presence::new(
             presence,
-            quick_xml::de::from_str(&msn_object.unwrap_or_default()).ok(),
+            if let Some(msn_object) = &msn_object {
+                quick_xml::de::from_str(msn_object).ok()
+            } else {
+                None
+            },
+            msn_object,
         );
 
         Chg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &presence).await

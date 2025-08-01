@@ -1,4 +1,3 @@
-use crate::MsnObject;
 use crate::enums::event::Event;
 use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
@@ -404,11 +403,8 @@ impl Switchboard {
     pub async fn request_contact_display_picture(
         &self,
         email: &str,
-        msn_object: &MsnObject,
+        msn_object: &str,
     ) -> Result<(), SdkError> {
-        let msn_object =
-            quick_xml::se::to_string(&msn_object).or(Err(SdkError::InvalidArgument))?;
-
         let user_email;
         {
             let user_data = self

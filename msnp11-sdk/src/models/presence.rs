@@ -7,14 +7,20 @@ pub struct Presence {
     pub status: MsnpStatus,
     pub client_id: u64,
     pub msn_object: Option<MsnObject>,
+    pub msn_object_string: Option<String>,
 }
 
 impl Presence {
-    pub(crate) fn new(status: MsnpStatus, msn_object: Option<MsnObject>) -> Self {
+    pub(crate) fn new(
+        status: MsnpStatus,
+        msn_object: Option<MsnObject>,
+        msn_object_string: Option<String>,
+    ) -> Self {
         Self {
             status,
             client_id: 0x40000000,
             msn_object,
+            msn_object_string,
         }
     }
 }

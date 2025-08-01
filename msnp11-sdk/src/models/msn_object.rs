@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// Serializable MSN object representing data like display pictures.
-#[derive(Serialize, Deserialize, Clone, Debug, uniffi::Record)]
+#[derive(Deserialize, Clone, Debug, uniffi::Record)]
 #[serde(rename = "msnobj")]
 pub struct MsnObject {
     #[serde(rename = "@Creator")]
@@ -17,5 +17,7 @@ pub struct MsnObject {
     #[serde(rename = "@SHA1D")]
     pub sha1d: String,
     #[serde(rename = "@SHA1C")]
-    pub sha1c: String,
+    pub sha1c: Option<String>,
+    #[serde(rename = "@contenttype")]
+    pub content_type: Option<String>,
 }
