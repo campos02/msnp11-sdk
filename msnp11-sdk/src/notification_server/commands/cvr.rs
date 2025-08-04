@@ -34,8 +34,20 @@ impl Cvr {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                if args[0] == "CVR" && args[1] == tr_id.to_string() {
-                    return Ok(());
+                match args[0] {
+                    "CVR" => {
+                        if args[1] == tr_id.to_string() {
+                            return Ok(());
+                        }
+                    }
+
+                    "420" | "710" | "731" => {
+                        if args[1] == tr_id.to_string() {
+                            return Err(SdkError::ServerError);
+                        }
+                    }
+
+                    _ => (),
                 }
             }
         }

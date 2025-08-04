@@ -48,7 +48,13 @@ impl UsrI {
                         }
                     }
 
-                    "911" => {
+                    "500" | "601" => {
+                        if args[1] == tr_id.to_string() {
+                            return Err(SdkError::ServerError);
+                        }
+                    }
+
+                    "911" | "931" => {
                         if args[1] == tr_id.to_string() {
                             return Err(SdkError::ServerIsBusy);
                         }
