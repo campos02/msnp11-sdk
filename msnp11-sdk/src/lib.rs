@@ -19,7 +19,7 @@
 //!         "123456",
 //!         "http://localhost:3000/rdr/pprdr.asp",
 //!         "msnp11-sdk",
-//!         "0.6"
+//!         "0.7"
 //!     )
 //!     .await
 //!  {
@@ -30,7 +30,7 @@
 //!             "123456",
 //!             "http://localhost:3000/rdr/pprdr.asp",
 //!             "msnp11-sdk",
-//!             "0.6"
+//!             "0.7"
 //!         )
 //!         .await
 //!         .unwrap();

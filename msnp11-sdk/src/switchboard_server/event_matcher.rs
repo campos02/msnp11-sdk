@@ -8,12 +8,7 @@ use std::io::Cursor;
 
 pub fn into_event(message: &Vec<u8>) -> Option<Event> {
     let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) };
-    let command = reply
-        .lines()
-        .next()
-        .expect("Could not get command from server message")
-        .to_string()
-        + "\r\n";
+    let command = reply.lines().next().unwrap_or_default().to_string() + "\r\n";
 
     let args: Vec<&str> = command.trim().split(' ').collect();
     match args[0] {
@@ -69,12 +64,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
 
 pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
     let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) }.to_string();
-    let command = reply
-        .lines()
-        .next()
-        .expect("Could not get command from server message")
-        .to_string()
-        + "\r\n";
+    let command = reply.lines().next().unwrap_or_default().to_string() + "\r\n";
 
     let args: Vec<&str> = command.trim().split(' ').collect();
     match args[0] {
@@ -92,47 +82,42 @@ pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
 
                 let destination = destination.replace("P2P-Dest: ", "");
                 let msg_headers = payload.split("\r\n\r\n").collect::<Vec<&str>>()[0];
-                let message =
+                let binary_payload =
                     message[(command.len() + msg_headers.len() + "\r\n\r\n".len())..].to_vec();
 
-                let binary_header = &message[..48];
+                let binary_header = &binary_payload[..48];
                 let mut cursor = Cursor::new(binary_header);
                 let Ok((_, binary_header)) = BinaryHeader::from_reader((&mut cursor, 0)) else {
                     return InternalEvent::ServerReply(reply);
                 };
 
-                if binary_header.flag == 0x20 || binary_header.flag == 0x1000020 {
-                    return InternalEvent::P2PData {
+                if binary_header.total_data_size == 4 && binary_payload[48..52].eq(&[0; 4])
+                    || payload.contains("200 OK")
+                {
+                    return InternalEvent::P2PShouldAck {
                         destination,
-                        message: message[..(message.len() - 4)].to_vec(),
+                        message: binary_payload,
                     };
                 }
 
-                if binary_header.total_data_size == 4 && message[48..52].eq(&[0; 4]) {
-                    return InternalEvent::P2PDataPreparation {
+                if binary_header.flag == 0x20 || binary_header.flag == 0x1000020 {
+                    return InternalEvent::P2PData {
                         destination,
-                        message,
+                        message: binary_payload[..(binary_payload.len() - 4)].to_vec(),
                     };
                 }
 
                 if payload.contains("INVITE") {
                     return InternalEvent::P2PInvite {
                         destination,
-                        message,
-                    };
-                }
-
-                if payload.contains("200 OK") {
-                    return InternalEvent::P2POk {
-                        destination,
-                        message,
+                        message: binary_payload,
                     };
                 }
 
                 if payload.contains("BYE") {
                     return InternalEvent::P2PBye {
                         destination,
-                        message,
+                        message: binary_payload,
                     };
                 }
             }

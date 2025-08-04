@@ -26,25 +26,26 @@ impl DisplayPictureSession {
     }
 
     pub fn new_from_invite(invite: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
-        let invite: Vec<&str> = unsafe { str::from_utf8_unchecked(invite.as_slice()) }
-            .split("\r\n")
-            .collect();
+        let mut invite = unsafe { str::from_utf8_unchecked(invite.as_slice()) }.split("\r\n");
 
-        let branch = invite[3]
+        let Some(branch) =
+            invite.find(|parameter| parameter.starts_with("Via: MSNSLP/1.0/TLP ;branch={"))
+        else {
+            return Err(SdkError::P2PInviteError.into());
+        };
+        let branch = branch
             .replace("Via: MSNSLP/1.0/TLP ;branch={", "")
             .replace("}", "");
 
-        let call_id = invite[5].replace("Call-ID: {", "").replace("}", "");
-
-        if invite[7] != "Content-Type: application/x-msnmsgr-sessionreqbody"
-            || invite[10] != "EUF-GUID: {A4268EEC-FEC5-49E5-95C3-F126696BDBF6}"
-        {
-            return Err(SdkError::P2PInviteError.into());
-        }
-
-        let Ok(session_id) = invite[11].replace("SessionID: ", "").parse::<u32>() else {
+        let Some(call_id) = invite.find(|parameter| parameter.starts_with("Call-ID: {")) else {
             return Err(SdkError::P2PInviteError.into());
         };
+        let call_id = call_id.replace("Call-ID: {", "").replace("}", "");
+
+        let Some(session_id) = invite.find(|parameter| parameter.starts_with("SessionID: ")) else {
+            return Err(SdkError::P2PInviteError.into());
+        };
+        let session_id = session_id.replace("SessionID: ", "").parse::<u32>()?;
 
         Ok(Self {
             session_id,
@@ -159,6 +160,38 @@ impl DisplayPictureSession {
         ok.extend_from_slice(message.as_bytes());
         ok.extend_from_slice(&[0; 4]);
         Ok(ok)
+    }
+
+    pub fn decline(&self, to: &str, from: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+        let body = format!("SessionID: {}\r\n\r\n\0", self.session_id);
+
+        let mut headers = "MSNSLP/1.0 603 Decline\r\n".to_string();
+        headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());
+        headers.push_str(format!("From: <msnmsgr:{from}>\r\n").as_str());
+        headers.push_str(format!("Via: MSNSLP/1.0/TLP ;branch={{{}}}\r\n", self.branch).as_str());
+        headers.push_str("CSeq: 1\r\n");
+        headers.push_str(format!("Call-ID: {{{}}}\r\n", self.call_id).as_str());
+        headers.push_str("Max-Forwards: 0\r\n");
+        headers.push_str("Content-Type: application/x-msnmsgr-sessionreqbody\r\n");
+        headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
+
+        let message = format!("{headers}{body}");
+        let mut decline = BinaryHeader {
+            session_id: 0,
+            identifier: self.base_identifier + 1,
+            data_offset: 0,
+            total_data_size: message.len() as u64,
+            length: message.len() as u32,
+            flag: 0x00,
+            ack_identifier: self.base_identifier + 1,
+            ack_unique_id: 0,
+            ack_data_size: 0,
+        }
+        .to_bytes()?;
+
+        decline.extend_from_slice(message.as_bytes());
+        decline.extend_from_slice(&[0; 4]);
+        Ok(decline)
     }
 
     pub fn data_preparation(&self) -> Result<Vec<u8>, Box<dyn Error>> {

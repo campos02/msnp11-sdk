@@ -31,7 +31,7 @@ use crate::switchboard_server::switchboard::Switchboard;
 use crate::user_data::UserData;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
-use log::trace;
+use log::{error, trace};
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -62,7 +62,7 @@ impl Client {
             .ip();
 
         let (event_tx, event_rx) = async_channel::bounded::<Event>(32);
-        let (ns_tx, mut ns_rx) = mpsc::channel::<Vec<u8>>(16);
+        let (ns_tx, mut ns_rx) = mpsc::channel::<Vec<u8>>(32);
         let (internal_tx, _) = broadcast::channel::<InternalEvent>(64);
 
         let socket = TcpStream::connect((server_ip, port))
@@ -74,22 +74,22 @@ impl Client {
         let internal_task_tx = internal_tx.clone();
         let event_task_tx = event_tx.clone();
         tokio::spawn(async move {
-            while let Ok(messages) = receive_split(&mut rd).await {
+            'outer: while let Ok(messages) = receive_split(&mut rd).await {
                 for message in messages {
                     let internal_event = into_internal_event(&message);
-                    internal_task_tx
-                        .send(internal_event)
-                        .expect("Error sending internal event to channel");
+                    if let Err(error) = internal_task_tx.send(internal_event) {
+                        error!("{error}");
+                    }
 
                     let event = into_event(&message);
                     if let Some(event) = event {
                         let disconnected =
                             matches!(event, Event::Disconnected | Event::LoggedInAnotherDevice);
 
-                        event_task_tx
-                            .send(event)
-                            .await
-                            .expect("Error sending event to channel");
+                        if let Err(error) = event_task_tx.send(event).await {
+                            error!("{error}");
+                            break 'outer;
+                        }
 
                         if disconnected {
                             event_task_tx.close();
@@ -101,9 +101,9 @@ impl Client {
 
         tokio::spawn(async move {
             while let Some(message) = ns_rx.recv().await {
-                wr.write_all(message.as_slice())
-                    .await
-                    .expect("Error sending message to socket");
+                if let Err(error) = wr.write_all(message.as_slice()).await {
+                    error!("{error}");
+                }
             }
         });
 
@@ -145,10 +145,9 @@ impl Client {
                 }
             }
 
-            event_tx
-                .send(Event::Disconnected)
-                .await
-                .expect("Error sending disconnection event");
+            if let Err(error) = event_tx.send(Event::Disconnected).await {
+                error!("{error}");
+            }
         });
     }
 
@@ -190,10 +189,12 @@ impl Client {
 
                     if let Ok(switchboard) = switchboard {
                         if switchboard.answer(&user_email, &session_id).await.is_ok() {
-                            event_tx
+                            if let Err(error) = event_tx
                                 .send(Event::SessionAnswered(Arc::new(switchboard)))
                                 .await
-                                .expect("Could not send invitation event to channel");
+                            {
+                                error!("{error}");
+                            }
                         }
                     }
                 }
