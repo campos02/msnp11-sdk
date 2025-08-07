@@ -38,7 +38,7 @@ impl SwitchboardWrapper {
     }
 
     /// Returns the session ID, if it's defined.
-    pub fn get_session_id(&self) -> Result<Option<String>, SdkError> {
+    pub fn get_session_id(&self) -> Result<String, SdkError> {
         self.inner.get_session_id()
     }
 

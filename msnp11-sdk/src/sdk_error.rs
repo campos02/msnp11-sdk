@@ -10,7 +10,7 @@ pub enum SdkError {
     ProtocolNotSupported,
     /// Authentication error. Check your email and password.
     ServerIsBusy,
-    /// Server returned an error when logging in.
+    /// Server returned an error while logging in.
     ServerError,
     /// Authentication error. Check your email and password.
     AuthenticationHeaderNotFound,
@@ -71,7 +71,7 @@ impl fmt::Display for SdkError {
                 write!(f, "Authentication error. Check your email and password")
             }
 
-            SdkError::ServerError => write!(f, "Server returned an error when logging in"),
+            SdkError::ServerError => write!(f, "Server returned an error while logging in"),
 
             SdkError::InvalidArgument => write!(f, "An invalid argument was sent"),
 

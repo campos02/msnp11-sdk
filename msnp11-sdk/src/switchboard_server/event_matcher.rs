@@ -11,27 +11,27 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
     let command = reply.lines().next().unwrap_or_default().to_string() + "\r\n";
 
     let args: Vec<&str> = command.trim().split(' ').collect();
-    match args[0] {
+    match *args.first().unwrap_or(&"") {
         "MSG" => {
-            if !args[1].contains("@") {
-                return None;
-            }
-
             let payload = reply.replace(command.as_str(), "");
             let content_type = payload.lines().nth(1)?;
 
-            if content_type.contains("text/plain") {
+            if content_type.contains("text/plain")
+                && let Some(email) = args.get(1)
+            {
                 return Some(Event::TextMessage {
-                    email: args[1].to_string(),
+                    email: email.to_string(),
                     message: PlainText::new(payload),
                 });
             }
 
             if content_type.contains("text/x-msnmsgr-datacast") {
-                let text = payload.split("\r\n\r\n").nth(1).unwrap_or("");
-                if text == "ID: 1" {
+                let text = payload.split("\r\n\r\n").nth(1).unwrap_or_default();
+                if text == "ID: 1"
+                    && let Some(email) = args.get(1)
+                {
                     return Some(Event::Nudge {
-                        email: args[1].to_string(),
+                        email: email.to_string(),
                     });
                 }
             }
@@ -46,16 +46,16 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
             None
         }
 
-        "JOI" => Some(Event::ParticipantInSwitchboard {
-            email: args[1].to_string(),
+        "JOI" => args.get(1).map(|email| Event::ParticipantInSwitchboard {
+            email: email.to_string(),
         }),
 
-        "IRO" => Some(Event::ParticipantInSwitchboard {
-            email: args[4].to_string(),
+        "IRO" => args.get(4).map(|email| Event::ParticipantInSwitchboard {
+            email: email.to_string(),
         }),
 
-        "BYE" => Some(Event::ParticipantLeftSwitchboard {
-            email: args[1].to_string(),
+        "BYE" => args.get(1).map(|email| Event::ParticipantLeftSwitchboard {
+            email: email.to_string(),
         }),
 
         _ => None,
@@ -67,7 +67,7 @@ pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
     let command = reply.lines().next().unwrap_or_default().to_string() + "\r\n";
 
     let args: Vec<&str> = command.trim().split(' ').collect();
-    match args[0] {
+    match *args.first().unwrap_or(&"") {
         "MSG" => {
             let payload = reply.replace(command.as_str(), "");
             let Some(content_type) = payload.lines().nth(1) else {
@@ -81,9 +81,14 @@ pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
                 };
 
                 let destination = destination.replace("P2P-Dest: ", "");
-                let msg_headers = payload.split("\r\n\r\n").collect::<Vec<&str>>()[0];
+                let msg_headers = payload.split("\r\n\r\n").next().unwrap_or_default();
+
                 let binary_payload =
                     message[(command.len() + msg_headers.len() + "\r\n\r\n".len())..].to_vec();
+
+                if binary_payload.len() < 52 {
+                    return InternalEvent::ServerReply(reply);
+                }
 
                 let binary_header = &binary_payload[..48];
                 let mut cursor = Cursor::new(binary_header);

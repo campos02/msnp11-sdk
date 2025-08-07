@@ -31,33 +31,23 @@ impl Rmg {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "RMG" => {
-                        if args[1] == tr_id.to_string() && args[3] == guid {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                            && *args.get(3).unwrap_or(&"") == guid
+                        {
                             return Ok(());
                         }
                     }
 
-                    "224" => {
-                        if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
-                    "226" => {
-                        if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
-                    "230" => {
-                        if args[1] == tr_id.to_string() {
+                    "224" | "226" | "230" => {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "603" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerError);
                         }
                     }

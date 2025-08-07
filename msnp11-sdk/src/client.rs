@@ -129,12 +129,12 @@ impl Client {
 
                 while let Ok(InternalEvent::ServerReply(reply)) = internal_rx.recv().await {
                     trace!("S: {reply}");
-
                     let args: Vec<&str> = reply.trim().split(' ').collect();
-                    if args[0] == "QNG" {
+
+                    if *args.first().unwrap_or(&"") == "QNG" {
                         // Parse and sanity check to avoid spamming the server
-                        if let Ok(duration) = args[1].parse()
-                            && duration > 10
+                        if let Ok(duration) = args.get(1).unwrap_or(&"").parse()
+                            && duration > 5
                         {
                             tokio::time::sleep(Duration::from_secs(duration)).await;
                             break;

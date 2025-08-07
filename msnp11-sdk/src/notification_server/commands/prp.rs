@@ -32,10 +32,10 @@ impl Prp {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                if args[0] == "PRP"
-                    && args[1] == tr_id.to_string()
-                    && args[2] == "MFN"
-                    && args[3] == display_name
+                if *args.first().unwrap_or(&"") == "PRP"
+                    && *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                    && *args.get(2).unwrap_or(&"") == "MFN"
+                    && *args.get(3).unwrap_or(&"") == display_name
                 {
                     return Ok(());
                 }

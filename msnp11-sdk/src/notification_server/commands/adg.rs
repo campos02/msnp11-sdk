@@ -32,21 +32,23 @@ impl Adg {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "ADG" => {
-                        if args[1] == tr_id.to_string() && args[3] == group_name {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                            && *args.get(3).unwrap_or(&"") == group_name
+                        {
                             return Ok(());
                         }
                     }
 
                     "228" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "603" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerError);
                         }
                     }

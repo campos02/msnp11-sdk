@@ -14,16 +14,18 @@ impl PlainText {
         let im_format = payload
             .lines()
             .nth(2)
-            .unwrap_or("")
+            .unwrap_or_default()
             .replace("X-MMS-IM-Format: ", "");
 
-        let im_format: Vec<&str> = im_format.split(";").collect();
+        let mut im_format = im_format.split(";");
+        let formatting = im_format.nth(1).unwrap_or_default();
+        let color = im_format.next().unwrap_or_default();
 
-        let bold = im_format[1].contains("B");
-        let italic = im_format[1].contains("I");
-        let underline = im_format[1].contains("U");
-        let strikethrough = im_format[1].contains("S");
-        let mut color = im_format[2].replace("CO=", "").trim().to_string();
+        let bold = formatting.contains("B");
+        let italic = formatting.contains("I");
+        let underline = formatting.contains("U");
+        let strikethrough = formatting.contains("S");
+        let mut color = color.replace("CO=", "").trim().to_string();
 
         while color.len() < 6 {
             color.insert(0, '0');
@@ -47,7 +49,7 @@ impl PlainText {
         let text = payload
             .split("\r\n\r\n")
             .nth(1)
-            .unwrap_or("")
+            .unwrap_or_default()
             .replace("\r\n", "\n");
 
         Self {

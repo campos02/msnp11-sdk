@@ -374,13 +374,13 @@ impl Switchboard {
     }
 
     /// Returns the session ID, if it's defined.
-    pub fn get_session_id(&self) -> Result<Option<String>, SdkError> {
+    pub fn get_session_id(&self) -> Result<String, SdkError> {
         let session_id = self
             .session_id
             .read()
             .or(Err(SdkError::CouldNotGetSessionId))?;
 
-        Ok(session_id.clone())
+        session_id.clone().ok_or(SdkError::CouldNotGetSessionId)
     }
 
     /// Sends a plain text message to the session.

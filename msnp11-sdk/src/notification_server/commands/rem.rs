@@ -41,36 +41,30 @@ impl Rem {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "REM" => {
-                        if args[1] == tr_id.to_string()
-                            && args[2] == list
-                            && args[3] == email.as_str()
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                            && *args.get(2).unwrap_or(&"") == list
+                            && *args.get(3).unwrap_or(&"") == email.as_str()
                         {
                             return Ok(());
                         }
                     }
 
-                    "201" => {
-                        if args[1] == tr_id.to_string() {
+                    "201" | "216" => {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "208" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidContact);
                         }
                     }
 
-                    "216" => {
-                        if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
                     "603" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerError);
                         }
                     }
@@ -105,36 +99,30 @@ impl Rem {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "REM" => {
-                        if args[1] == tr_id.to_string()
-                            && args[2] == "FL"
-                            && args[3] == guid.as_str()
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                            && *args.get(2).unwrap_or(&"") == "FL"
+                            && *args.get(3).unwrap_or(&"") == guid.as_str()
                         {
                             return Ok(());
                         }
                     }
 
-                    "201" => {
-                        if args[1] == tr_id.to_string() {
+                    "201" | "216" => {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "208" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidContact);
                         }
                     }
 
-                    "216" => {
-                        if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
                     "603" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerError);
                         }
                     }
@@ -170,49 +158,31 @@ impl Rem {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "REM" => {
-                        if args[1] == tr_id.to_string()
-                            && args[2] == "FL"
-                            && args[3] == guid.as_str()
-                            && args[4] == group_guid.as_str()
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                            && *args.get(2).unwrap_or(&"") == "FL"
+                            && *args.get(3).unwrap_or(&"") == guid.as_str()
+                            && *args.get(4).unwrap_or(&"") == group_guid.as_str()
                         {
                             return Ok(());
                         }
                     }
 
-                    "201" => {
-                        if args[1] == tr_id.to_string() {
+                    "201" | "216" | "224" | "225" => {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "208" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidContact);
                         }
                     }
 
-                    "216" => {
-                        if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
-                    "224" => {
-                        if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
-                    "225" => {
-                        if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
                     "603" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerError);
                         }
                     }

@@ -31,7 +31,10 @@ impl Blp {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                if args[0] == "BLP" && args[1] == tr_id.to_string() && args[2] == blp {
+                if *args.first().unwrap_or(&"") == "BLP"
+                    && *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                    && *args.get(2).unwrap_or(&"") == blp
+                {
                     return Ok(());
                 }
             }

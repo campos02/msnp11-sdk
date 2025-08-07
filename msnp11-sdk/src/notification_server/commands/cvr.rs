@@ -34,15 +34,15 @@ impl Cvr {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "CVR" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Ok(());
                         }
                     }
 
                     "420" | "710" | "731" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerError);
                         }
                     }

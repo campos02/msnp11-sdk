@@ -31,31 +31,43 @@ impl UsrI {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "USR" => {
-                        if args[1] == tr_id.to_string() && args[2] == "TWN" && args[3] == "S" {
-                            return Ok(InternalEvent::GotAuthorizationString(args[4].to_string()));
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                            && *args.get(2).unwrap_or(&"") == "TWN"
+                            && *args.get(3).unwrap_or(&"") == "S"
+                            && let Some(authorization_string) = args.get(4)
+                        {
+                            return Ok(InternalEvent::GotAuthorizationString(
+                                authorization_string.to_string(),
+                            ));
                         }
                     }
 
                     "XFR" => {
-                        if args[1] == tr_id.to_string() && args[2] == "NS" {
-                            let server_and_port: Vec<&str> = args[3].trim().split(':').collect();
-                            return Ok(InternalEvent::RedirectedTo {
-                                server: server_and_port[0].to_string(),
-                                port: server_and_port[1].parse::<u16>().unwrap_or(1863),
-                            });
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                            && *args.get(2).unwrap_or(&"") == "NS"
+                        {
+                            let mut server_and_port = args.get(3).unwrap_or(&"").split(":");
+                            if let Some(server) = server_and_port.next()
+                                && let Some(port) = server_and_port.next()
+                            {
+                                return Ok(InternalEvent::RedirectedTo {
+                                    server: server.to_string(),
+                                    port: port.parse::<u16>().unwrap_or(1863),
+                                });
+                            }
                         }
                     }
 
                     "500" | "601" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerError);
                         }
                     }
 
                     "911" | "931" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerIsBusy);
                         }
                     }

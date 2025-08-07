@@ -33,27 +33,24 @@ impl Reg {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "REG" => {
-                        if args[1] == tr_id.to_string() && args[3] == new_name && args[4] == guid {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                            && *args.get(3).unwrap_or(&"") == new_name
+                            && *args.get(4).unwrap_or(&"") == guid
+                        {
                             return Ok(());
                         }
                     }
 
-                    "224" => {
-                        if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
-                    "228" => {
-                        if args[1] == tr_id.to_string() {
+                    "224" | "228" => {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "603" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerError);
                         }
                     }

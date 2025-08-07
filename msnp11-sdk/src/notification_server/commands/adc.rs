@@ -54,17 +54,18 @@ impl Adc {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "ADC" => match list {
                         MsnpList::ForwardList => {
-                            if args[1] == tr_id.to_string()
-                                && args[2] == "FL"
-                                && args[3].replace("N=", "") == email.as_str()
+                            if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                                && *args.get(2).unwrap_or(&"") == "FL"
+                                && args.get(3).unwrap_or(&"").replace("N=", "") == email.as_str()
+                                && let Some(guid) = args.get(5)
                             {
                                 return Ok(Event::ContactInForwardList {
                                     email: email.to_owned(),
                                     display_name: display_name.to_owned(),
-                                    guid: args[5].replace("C=", ""),
+                                    guid: guid.replace("C=", ""),
                                     lists: vec![MsnpList::ForwardList],
                                     groups: vec![],
                                 });
@@ -80,9 +81,9 @@ impl Adc {
                                 MsnpList::PendingList => "PL",
                             };
 
-                            if args[1] == tr_id.to_string()
-                                && args[2] == list_str
-                                && args[3].replace("N=", "") == email.as_str()
+                            if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                                && *args.get(2).unwrap_or(&"") == list_str
+                                && args.get(3).unwrap_or(&"").replace("N=", "") == email.as_str()
                             {
                                 return Ok(Event::Contact {
                                     email: email.to_owned(),
@@ -93,26 +94,20 @@ impl Adc {
                         }
                     },
 
-                    "201" => {
-                        if args[1] == tr_id.to_string() {
+                    "201" | "215" => {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "208" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidContact);
                         }
                     }
 
-                    "215" => {
-                        if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
                     "603" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerError);
                         }
                     }
@@ -148,43 +143,31 @@ impl Adc {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "ADC" => {
-                        if args[1] == tr_id.to_string()
-                            && args[2] == "FL"
-                            && args[3].replace("C=", "") == guid.as_str()
-                            && args[4] == group_guid.as_str()
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                            && *args.get(2).unwrap_or(&"") == "FL"
+                            && args.get(3).unwrap_or(&"").replace("C=", "") == guid.as_str()
+                            && *args.get(4).unwrap_or(&"") == group_guid.as_str()
                         {
                             return Ok(());
                         }
                     }
 
-                    "201" => {
-                        if args[1] == tr_id.to_string() {
+                    "201" | "215" | "224" => {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "208" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidContact);
                         }
                     }
 
-                    "215" => {
-                        if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
-                    "224" => {
-                        if args[1] == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
                     "603" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerError);
                         }
                     }

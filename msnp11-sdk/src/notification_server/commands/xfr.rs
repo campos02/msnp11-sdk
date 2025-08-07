@@ -34,16 +34,17 @@ impl Xfr {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                if args[0] == "XFR" && args[1] == tr_id.to_string() && args[2] == "SB" {
-                    let server_and_port = args[3].split(":").collect::<Vec<&str>>();
-
-                    return Switchboard::new(
-                        server_and_port[0],
-                        server_and_port[1],
-                        args[5],
-                        user_data,
-                    )
-                    .await;
+                if *args.first().unwrap_or(&"") == "XFR"
+                    && *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                    && *args.get(2).unwrap_or(&"") == "SB"
+                    && let Some(cki_string) = args.get(5)
+                {
+                    let mut server_and_port = args.get(3).unwrap_or(&"").split(":");
+                    if let Some(server) = server_and_port.next()
+                        && let Some(port) = server_and_port.next()
+                    {
+                        return Switchboard::new(server, port, cki_string, user_data).await;
+                    }
                 }
             }
         }

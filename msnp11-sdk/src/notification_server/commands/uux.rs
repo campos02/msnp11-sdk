@@ -38,7 +38,9 @@ impl Uux {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                if args[0] == "UUX" && args[1] == tr_id.to_string() {
+                if *args.first().unwrap_or(&"") == "UUX"
+                    && *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                {
                     return Ok(());
                 }
             }

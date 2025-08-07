@@ -33,31 +33,31 @@ impl Sbp {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "SBP" => {
-                        if args[1] == tr_id.to_string()
-                            && args[2] == guid
-                            && args[3] == "MFN"
-                            && args[4] == display_name
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                            && *args.get(2).unwrap_or(&"") == guid
+                            && *args.get(3).unwrap_or(&"") == "MFN"
+                            && *args.get(4).unwrap_or(&"") == display_name
                         {
                             return Ok(());
                         }
                     }
 
                     "201" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidArgument);
                         }
                     }
 
                     "208" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::InvalidContact);
                         }
                     }
 
                     "603" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerError);
                         }
                     }

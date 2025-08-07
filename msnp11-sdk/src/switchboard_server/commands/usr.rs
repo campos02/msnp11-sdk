@@ -32,15 +32,17 @@ impl Usr {
                 trace!("S: {reply}");
 
                 let args: Vec<&str> = reply.trim().split(' ').collect();
-                match args[0] {
+                match *args.first().unwrap_or(&"") {
                     "USR" => {
-                        if args[1] == tr_id.to_string() && args[2] == "OK" {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string()
+                            && *args.get(2).unwrap_or(&"") == "OK"
+                        {
                             return Ok(());
                         }
                     }
 
                     "911" => {
-                        if args[1] == tr_id.to_string() {
+                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
                             return Err(SdkError::ServerIsBusy);
                         }
                     }
