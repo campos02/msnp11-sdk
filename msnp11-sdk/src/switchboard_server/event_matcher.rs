@@ -83,8 +83,10 @@ pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
                 let destination = destination.replace("P2P-Dest: ", "");
                 let msg_headers = payload.split("\r\n\r\n").next().unwrap_or_default();
 
-                let binary_payload =
-                    message[(command.len() + msg_headers.len() + "\r\n\r\n".len())..].to_vec();
+                let binary_payload = message
+                    .get((command.len() + msg_headers.len() + "\r\n\r\n".len())..)
+                    .unwrap_or_default()
+                    .to_vec();
 
                 if binary_payload.len() < 52 {
                     return InternalEvent::ServerReply(reply);

@@ -491,13 +491,15 @@ impl Switchboard {
                         continue;
                     }
 
-                    let binary_header = &data[..48];
+                    let binary_header = data.get(..48).ok_or(SdkError::BinaryHeaderReadingError)?;
                     let mut cursor = Cursor::new(binary_header);
-
                     let (_, binary_header) = BinaryHeader::from_reader((&mut cursor, 0))
                         .or(Err(SdkError::BinaryHeaderReadingError))?;
 
-                    picture.extend_from_slice(&data[48..]);
+                    picture.extend_from_slice(
+                        data.get(48..).ok_or(SdkError::BinaryHeaderReadingError)?,
+                    );
+
                     let data_len = picture.len();
                     trace!("Data received so far: {data_len}");
 

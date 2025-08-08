@@ -105,9 +105,11 @@ impl DisplayPictureSession {
     }
 
     pub fn acknowledge(payload: &[u8]) -> Result<Vec<u8>, SdkError> {
-        let binary_header = &payload[..48];
-        let mut cursor = Cursor::new(binary_header);
+        let binary_header = payload
+            .get(..48)
+            .ok_or(SdkError::BinaryHeaderReadingError)?;
 
+        let mut cursor = Cursor::new(binary_header);
         let (_, binary_header) = BinaryHeader::from_reader((&mut cursor, 0))
             .or(Err(SdkError::BinaryHeaderReadingError))?;
 

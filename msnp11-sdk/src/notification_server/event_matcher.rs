@@ -139,7 +139,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
                 None
             };
 
-            let status = match args[base_index + 1] {
+            let status = match *args.get(base_index + 1)? {
                 "BSY" => MsnpStatus::Busy,
                 "AWY" => MsnpStatus::Away,
                 "IDL" => MsnpStatus::Idle,
