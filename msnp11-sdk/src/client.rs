@@ -204,8 +204,8 @@ impl Client {
         Ok(())
     }
 
-    /// Adds a handler closure. If you're using this SDK with Rust, not through a foreign binding, then this is the preferred method of
-    /// handling events.
+    /// Adds a handler closure. If you're using this SDK with Rust, not through a foreign language binding, then this is the preferred
+    /// method of receiving and handling events.
     pub fn add_event_handler_closure<F, R>(&self, f: F)
     where
         F: Fn(Event) -> R + Send + 'static,
@@ -232,11 +232,11 @@ impl Client {
         });
     }
 
-    /// Does the MSNP authentication process. Also starts regular pings and the handler for switchboard_server invitations.
+    /// Does the MSNP authentication process. Also starts regular pings and the handler for Switchboard invitations.
     ///
     /// # Events
     /// If the server you're connecting to implements a Dispatch Server, then this will return a [RedirectedTo][Event::RedirectedTo] event.
-    /// The proceeding is to [create a new][Client::new] instance with the server and port returned as arguments, then login normally, which
+    /// What follows is [creating a new][Client::new] client instance with the server and port returned then logging in again, which
     /// will return an [Authenticated][Event::Authenticated] event.
     pub async fn login(
         &self,
@@ -371,8 +371,8 @@ impl Client {
         .await
     }
 
-    /// Removes a contact from a specified list that's not the forward list, that requires a GUID and calling
-    /// [remove_contact_from_forward_list][Client::remove_contact_from_forward_list].
+    /// Removes a contact from a specified list (except the forward list, which requires calling
+    /// [remove_contact_from_forward_list][Client::remove_contact_from_forward_list]).
     pub async fn remove_contact(&self, email: &str, list: MsnpList) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         Rem::send(&self.tr_id, &self.ns_tx, &mut internal_rx, email, list).await
@@ -449,11 +449,7 @@ impl Client {
     }
 
     /// Adds a contact to a group.
-    pub async fn add_contact_to_group(
-        &self,
-        guid: &str,
-        group_guid: &str,
-    ) -> Result<(), SdkError> {
+    pub async fn add_contact_to_group(&self, guid: &str, group_guid: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         Adc::send_with_group(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, group_guid).await
     }
@@ -480,7 +476,7 @@ impl Client {
         Blp::send(&self.tr_id, &self.ns_tx, &mut internal_rx, blp).await
     }
 
-    /// Creates a new switchboard_server with the specified contact. Returns the created SB, which is used for messaging.
+    /// Creates and returns a new Switchboard session with the specified contact.
     pub async fn create_session(&self, email: &str) -> Result<Switchboard, SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         let user_email;
@@ -510,8 +506,8 @@ impl Client {
         Ok(switchboard)
     }
 
-    /// Sets the user's display picture, returning a standard base64 encoded hash of the picture.
-    /// This method uses the picture's binary data, and scaling down to a size like 200x200 is recommended.
+    /// Sets the user's display picture, returning a standard base64 encoded hash of it.
+    /// This method uses the picture's binary data, and scaling down beforehand to a size like 200x200 is recommended.
     pub fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<String, SdkError> {
         let mut user_data = self
             .user_data

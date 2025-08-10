@@ -5,32 +5,35 @@ use crate::models::presence::Presence;
 use crate::switchboard_server::switchboard::Switchboard;
 use std::sync::Arc;
 
-/// Contact and messaging events returned.
+/// Contact and messaging events.
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum Event {
-    /// The Dispatch Server replied with a command asking to connect to another server.
+    /// The Dispatch Server replied with a command asking to connect to a Notification Server.
     RedirectedTo { server: String, port: u16 },
 
     /// Authenticated successfully.
     Authenticated,
+
     /// GTC value stored in the server.
     Gtc(String),
+
     /// BLP value stored in the server.
     Blp(String),
+
     /// User display name stored in the server.
     DisplayName(String),
 
-    /// Contact group
+    /// A contact group
     Group { name: String, guid: String },
 
-    /// Contact not in forward list.
+    /// A contact not in the forward list.
     Contact {
         email: String,
         display_name: String,
         lists: Vec<MsnpList>,
     },
 
-    /// Contact in forward list.
+    /// A contact in the forward list.
     ContactInForwardList {
         email: String,
         display_name: String,
@@ -61,7 +64,7 @@ pub enum Event {
     /// Removed from someone's forward list.
     RemovedBy(String),
 
-    /// An invitation to a switchboard_server session was accepted.
+    /// An invitation to a Switchboard session was accepted.
     SessionAnswered(Arc<Switchboard>),
 
     /// New text message.
@@ -73,17 +76,18 @@ pub enum Event {
     /// Contact is writing...
     TypingNotification { email: String },
 
-    /// New user joined the switchboard_server.
+    /// New user joined the Switchboard.
     ParticipantInSwitchboard { email: String },
 
-    /// A user left the switchboard_server.
+    /// A user left the Switchboard.
     ParticipantLeftSwitchboard { email: String },
 
-    /// A contact's display picture.
+    /// A contact's display picture was transferred.
     DisplayPicture { email: String, data: Vec<u8> },
 
     /// Disconnected because the user logged in on another device.
     LoggedInAnotherDevice,
+
     /// Lost connection to the server.
     Disconnected,
 }

@@ -24,8 +24,8 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc};
 
-/// Represents a messaging session with one or more contacts. The official MSNP clients usually create a new session every time a conversation
-/// window is opened and leave it when it's closed.
+/// Represents a messaging session with one or more contacts. The official MSN clients usually create a new session every time a conversation
+/// window is opened and leave it once it's closed.
 #[derive(Debug, uniffi::Object)]
 pub struct Switchboard {
     event_tx: async_channel::Sender<Event>,
@@ -357,7 +357,7 @@ impl Switchboard {
         });
     }
 
-    /// Invites a new contact to this switchboard session. This makes them temporary chat rooms.
+    /// Invites a new contact to this switchboard session. This makes it a temporary group chat.
     pub async fn invite(&self, email: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
 
@@ -371,7 +371,7 @@ impl Switchboard {
         Ok(())
     }
 
-    /// Returns the session ID, if it's defined.
+    /// Returns the session ID, if defined.
     pub fn get_session_id(&self) -> Result<String, SdkError> {
         let session_id = self
             .session_id
@@ -398,7 +398,8 @@ impl Switchboard {
         Msg::send_typing_user(&self.tr_id, &self.sb_tx, email).await
     }
 
-    /// Requests the contact's display picture and handles the transfer process.
+    /// Requests a contact's display picture and handles the transfer process. A [DisplayPicture][Event::DisplayPicture] event
+    /// is received once the transfer is complete.
     pub async fn request_contact_display_picture(
         &self,
         email: &str,
@@ -530,7 +531,7 @@ impl Switchboard {
         Ok(())
     }
 
-    /// Disconnects from the switchboard.
+    /// Disconnects from the Switchboard.
     pub async fn disconnect(&self) -> Result<(), SdkError> {
         let command = "OUT\r\n";
         trace!("C: {command}");

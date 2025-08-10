@@ -40,7 +40,7 @@ pub enum SdkError {
     ReceivingError,
     /// Error transmitting data.
     TransmittingError,
-    /// Could not get session ID.
+    /// Could not set session ID.
     CouldNotSetSessionId,
     /// Could not get session ID.
     CouldNotGetSessionId,
@@ -104,7 +104,7 @@ impl fmt::Display for SdkError {
             SdkError::TransmittingError => write!(f, "Error transmitting data"),
 
             SdkError::CouldNotSetSessionId => {
-                write!(f, "Could not set session ID from switchboard_server")
+                write!(f, "Could not set session ID")
             }
 
             SdkError::CouldNotGetSessionId => {

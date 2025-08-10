@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-/// Serializable MSN object representing data like display pictures.
+/// MSN object representing data like display pictures.
 #[derive(Deserialize, Clone, Debug, uniffi::Record)]
 #[serde(rename = "msnobj")]
 pub struct MsnObject {

@@ -4,10 +4,10 @@ use crate::{PlainText, Switchboard};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-/// Wraps an obtained [Switchboard][crate::switchboard_server::switchboard_server::Switchboard] object for use outside a tokio main.
+/// Wraps an obtained [Switchboard][crate::switchboard_server::switchboard_server::Switchboard] object for use outside a tokio runtime.
 /// [Switchboard][crate::switchboard_server::switchboard_server::Switchboard] represents a messaging session with one or more
-/// contacts. The official MSNP clients usually create a new session every time a conversation
-/// window is opened and leave it when it's closed.
+/// contacts. The official MSN clients usually create a new session every time a conversation
+/// window is opened and leave it once it's closed.
 #[derive(uniffi::Object)]
 pub struct SwitchboardWrapper {
     inner: Arc<Switchboard>,
@@ -32,12 +32,12 @@ impl SwitchboardWrapper {
             .block_on(async { self.inner.add_event_handler(handler) })
     }
 
-    /// Invites a new contact to this switchboard_server session. This makes them temporary chat rooms.
+    /// Invites a new contact to this switchboard session. This makes it a temporary group chat.
     pub async fn invite(&self, email: &str) -> Result<(), SdkError> {
         self.inner.invite(email).await
     }
 
-    /// Returns the session ID, if it's defined.
+    /// Returns the session ID, if defined.
     pub fn get_session_id(&self) -> Result<String, SdkError> {
         self.inner.get_session_id()
     }
@@ -57,7 +57,8 @@ impl SwitchboardWrapper {
         self.inner.send_typing_user(email).await
     }
 
-    /// Requests the contact's display picture and handles the transfer process.
+    /// Requests a contact's display picture and handles the transfer process. A [DisplayPicture][Event::DisplayPicture] event
+    /// is received once the transfer is complete.
     pub async fn request_contact_display_picture(
         &self,
         email: &str,
@@ -68,7 +69,7 @@ impl SwitchboardWrapper {
             .await
     }
 
-    /// Disconnects from the server.
+    /// Disconnects from the Switchboard.
     pub async fn disconnect(&self) -> Result<(), SdkError> {
         self.inner.disconnect().await
     }

@@ -28,11 +28,11 @@ impl Client {
             .block_on(async { self.inner.add_event_handler(handler) })
     }
 
-    /// Does the MSNP authentication process. Also starts regular pings and the handler for switchboard_server invitations.
+    /// Does the MSNP authentication process. Also starts regular pings and the handler for Switchboard invitations.
     ///
     /// # Events
     /// If the server you're connecting to implements a Dispatch Server, then this will return a [RedirectedTo][Event::RedirectedTo] event.
-    /// The proceeding is to [create a new][Client::new] instance with the server and port returned as arguments, then login normally, which
+    /// What follows is [creating a new][Client::new] client instance with the server and port returned then logging in again, which
     /// will return an [Authenticated][Event::Authenticated] event.
     pub async fn login(
         &self,
@@ -88,8 +88,8 @@ impl Client {
         self.inner.add_contact(email, display_name, list).await
     }
 
-    /// Removes a contact from a specified list that's not the forward list, that requires a GUID and calling
-    /// [remove_contact_from_forward_list][Client::remove_contact_from_forward_list].
+    /// Removes a contact from a specified list (except the forward list, which requires calling
+    /// [remove_contact_from_forward_list][Client::remove_contact_from_forward_list]).
     pub async fn remove_contact(&self, email: &str, list: MsnpList) -> Result<(), SdkError> {
         self.inner.remove_contact(email, list).await
     }
@@ -125,11 +125,7 @@ impl Client {
     }
 
     /// Adds a contact to a group.
-    pub async fn add_contact_to_group(
-        &self,
-        guid: &str,
-        group_guid: &str,
-    ) -> Result<(), SdkError> {
+    pub async fn add_contact_to_group(&self, guid: &str, group_guid: &str) -> Result<(), SdkError> {
         self.inner.add_contact_to_group(guid, group_guid).await
     }
 
@@ -152,13 +148,14 @@ impl Client {
         self.inner.set_blp(blp).await
     }
 
-    /// Creates a new switchboard_server with the specified contact. Returns the created SB, which is used for messaging.
+    /// Creates and returns a new Switchboard session with the specified contact.
     pub async fn create_session(&self, email: &str) -> Result<Switchboard, SdkError> {
         self.rt
             .block_on(async { self.inner.create_session(email).await })
     }
 
-    /// Sets the user's display picture. This method uses the picture's binary data, and scaling down to a size like 96x96 is recommended.
+    /// Sets the user's display picture, returning a standard base64 encoded hash of it.
+    /// This method uses the picture's binary data, and scaling down beforehand to a size like 200x200 is recommended.
     pub fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<String, SdkError> {
         self.inner.set_display_picture(display_picture)
     }
