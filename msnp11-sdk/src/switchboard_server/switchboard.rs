@@ -131,8 +131,6 @@ impl Switchboard {
                         let mut invite_parameters = invite_string.lines();
 
                         invite_parameters.next();
-                        invite_parameters.next();
-
                         let Some(to) = invite_parameters.next() else {
                             continue;
                         };
@@ -516,7 +514,7 @@ impl Switchboard {
             }
 
             // Introduce some delay so all chunks are received
-            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
         let bye = session.bye(email, &user_email)?;
