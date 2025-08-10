@@ -11,7 +11,7 @@ impl Reg {
         tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
         internal_rx: &mut broadcast::Receiver<InternalEvent>,
-        guid: &String,
+        guid: &str,
         new_name: &str,
     ) -> Result<(), SdkError> {
         tr_id.fetch_add(1, Ordering::SeqCst);

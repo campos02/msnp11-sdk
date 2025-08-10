@@ -11,7 +11,7 @@ impl Rmg {
         tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
         internal_rx: &mut broadcast::Receiver<InternalEvent>,
-        guid: &String,
+        guid: &str,
     ) -> Result<(), SdkError> {
         tr_id.fetch_add(1, Ordering::SeqCst);
         let tr_id = tr_id.load(Ordering::SeqCst);

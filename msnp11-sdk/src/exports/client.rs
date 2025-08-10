@@ -81,8 +81,8 @@ impl Client {
     /// Adds a contact to a specified list, also setting its display name if applicable.
     pub async fn add_contact(
         &self,
-        email: &String,
-        display_name: &String,
+        email: &str,
+        display_name: &str,
         list: MsnpList,
     ) -> Result<Event, SdkError> {
         self.inner.add_contact(email, display_name, list).await
@@ -90,22 +90,22 @@ impl Client {
 
     /// Removes a contact from a specified list that's not the forward list, that requires a GUID and calling
     /// [remove_contact_from_forward_list][Client::remove_contact_from_forward_list].
-    pub async fn remove_contact(&self, email: &String, list: MsnpList) -> Result<(), SdkError> {
+    pub async fn remove_contact(&self, email: &str, list: MsnpList) -> Result<(), SdkError> {
         self.inner.remove_contact(email, list).await
     }
 
     /// Removes a contact from the forward list.
-    pub async fn remove_contact_from_forward_list(&self, guid: &String) -> Result<(), SdkError> {
+    pub async fn remove_contact_from_forward_list(&self, guid: &str) -> Result<(), SdkError> {
         self.inner.remove_contact_from_forward_list(guid).await
     }
 
     /// Blocks a contact.
-    pub async fn block_contact(&self, email: &String) -> Result<(), SdkError> {
+    pub async fn block_contact(&self, email: &str) -> Result<(), SdkError> {
         self.inner.block_contact(email).await
     }
 
     /// Unblocks a contact.
-    pub async fn unblock_contact(&self, email: &String) -> Result<(), SdkError> {
+    pub async fn unblock_contact(&self, email: &str) -> Result<(), SdkError> {
         self.inner.unblock_contact(email).await
     }
 
@@ -115,20 +115,20 @@ impl Client {
     }
 
     /// Deletes a contact group.
-    pub async fn delete_group(&self, guid: &String) -> Result<(), SdkError> {
+    pub async fn delete_group(&self, guid: &str) -> Result<(), SdkError> {
         self.inner.delete_group(guid).await
     }
 
     /// Renames a contact group.
-    pub async fn rename_group(&self, guid: &String, new_name: &str) -> Result<(), SdkError> {
+    pub async fn rename_group(&self, guid: &str, new_name: &str) -> Result<(), SdkError> {
         self.inner.rename_group(guid, new_name).await
     }
 
     /// Adds a contact to a group.
     pub async fn add_contact_to_group(
         &self,
-        guid: &String,
-        group_guid: &String,
+        guid: &str,
+        group_guid: &str,
     ) -> Result<(), SdkError> {
         self.inner.add_contact_to_group(guid, group_guid).await
     }
@@ -136,19 +136,19 @@ impl Client {
     /// Removes a contact from a group.
     pub async fn remove_contact_from_group(
         &self,
-        guid: &String,
-        group_guid: &String,
+        guid: &str,
+        group_guid: &str,
     ) -> Result<(), SdkError> {
         self.inner.remove_contact_from_group(guid, group_guid).await
     }
 
     /// Sets the GTC value, which can be either `A` or `N`.
-    pub async fn set_gtc(&self, gtc: &String) -> Result<(), SdkError> {
+    pub async fn set_gtc(&self, gtc: &str) -> Result<(), SdkError> {
         self.inner.set_gtc(gtc).await
     }
 
     /// Sets the GTC value, which can be either `AL` or `BL`.
-    pub async fn set_blp(&self, blp: &String) -> Result<(), SdkError> {
+    pub async fn set_blp(&self, blp: &str) -> Result<(), SdkError> {
         self.inner.set_blp(blp).await
     }
 

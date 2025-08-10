@@ -457,9 +457,8 @@ impl Switchboard {
                     let mut invite_parameters = invite_string.lines();
 
                     invite_parameters.next();
-                    invite_parameters.next();
-
                     let to = invite_parameters.next().ok_or(SdkError::P2PInviteError)?;
+
                     if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
                         continue;
                     }

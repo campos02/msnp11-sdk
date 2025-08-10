@@ -12,7 +12,7 @@ impl Rem {
         tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
         internal_rx: &mut broadcast::Receiver<InternalEvent>,
-        email: &String,
+        email: &str,
         list: MsnpList,
     ) -> Result<(), SdkError> {
         tr_id.fetch_add(1, Ordering::SeqCst);
@@ -45,7 +45,7 @@ impl Rem {
                     "REM" => {
                         if *args.get(1).unwrap_or(&"") == tr_id.to_string()
                             && *args.get(2).unwrap_or(&"") == list
-                            && *args.get(3).unwrap_or(&"") == email.as_str()
+                            && *args.get(3).unwrap_or(&"") == email
                         {
                             return Ok(());
                         }
@@ -79,7 +79,7 @@ impl Rem {
         tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
         internal_rx: &mut broadcast::Receiver<InternalEvent>,
-        guid: &String,
+        guid: &str,
     ) -> Result<(), SdkError> {
         tr_id.fetch_add(1, Ordering::SeqCst);
         let tr_id = tr_id.load(Ordering::SeqCst);
@@ -103,7 +103,7 @@ impl Rem {
                     "REM" => {
                         if *args.get(1).unwrap_or(&"") == tr_id.to_string()
                             && *args.get(2).unwrap_or(&"") == "FL"
-                            && *args.get(3).unwrap_or(&"") == guid.as_str()
+                            && *args.get(3).unwrap_or(&"") == guid
                         {
                             return Ok(());
                         }
@@ -137,8 +137,8 @@ impl Rem {
         tr_id: &AtomicU32,
         ns_tx: &mpsc::Sender<Vec<u8>>,
         internal_rx: &mut broadcast::Receiver<InternalEvent>,
-        guid: &String,
-        group_guid: &String,
+        guid: &str,
+        group_guid: &str,
     ) -> Result<(), SdkError> {
         tr_id.fetch_add(1, Ordering::SeqCst);
         let tr_id = tr_id.load(Ordering::SeqCst);
@@ -162,8 +162,8 @@ impl Rem {
                     "REM" => {
                         if *args.get(1).unwrap_or(&"") == tr_id.to_string()
                             && *args.get(2).unwrap_or(&"") == "FL"
-                            && *args.get(3).unwrap_or(&"") == guid.as_str()
-                            && *args.get(4).unwrap_or(&"") == group_guid.as_str()
+                            && *args.get(3).unwrap_or(&"") == guid
+                            && *args.get(4).unwrap_or(&"") == group_guid
                         {
                             return Ok(());
                         }
