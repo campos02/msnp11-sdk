@@ -1,4 +1,4 @@
-use crate::sdk_error::SdkError;
+use crate::errors::sdk_error::SdkError;
 use reqwest::header::{AUTHORIZATION, HeaderMap};
 use std::error::Error;
 

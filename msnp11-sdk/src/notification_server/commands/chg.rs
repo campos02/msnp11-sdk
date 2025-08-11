@@ -1,7 +1,7 @@
 use crate::enums::msnp_status::MsnpStatus;
+use crate::errors::sdk_error::SdkError;
 use crate::internal_event::InternalEvent;
 use crate::models::presence::Presence;
-use crate::sdk_error::SdkError;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::{broadcast, mpsc};
@@ -11,6 +11,7 @@ pub async fn send(
     ns_tx: &mpsc::Sender<Vec<u8>>,
     internal_rx: &mut broadcast::Receiver<InternalEvent>,
     presence: &Presence,
+    msn_object: Option<&str>,
 ) -> Result<(), SdkError> {
     tr_id.fetch_add(1, Ordering::SeqCst);
     let tr_id = tr_id.load(Ordering::SeqCst);
@@ -27,7 +28,7 @@ pub async fn send(
     };
 
     let mut command = format!("CHG {tr_id} {status} {}\r\n", presence.client_id);
-    if let Some(msn_object) = &presence.msn_object_string {
+    if let Some(msn_object) = msn_object {
         command = command.replace(
             "\r\n",
             format!(" {}\r\n", urlencoding::encode(msn_object)).as_str(),

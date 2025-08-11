@@ -1,5 +1,5 @@
+use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
-use crate::sdk_error::SdkError;
 use crate::{PlainText, Switchboard};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -38,8 +38,8 @@ impl SwitchboardWrapper {
     }
 
     /// Returns the session ID, if defined.
-    pub fn get_session_id(&self) -> Result<String, SdkError> {
-        self.inner.get_session_id()
+    pub async fn get_session_id(&self) -> Result<String, SdkError> {
+        self.inner.get_session_id().await
     }
 
     /// Sends a plain text message to the session.

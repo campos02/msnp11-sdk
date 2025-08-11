@@ -1,6 +1,6 @@
+use crate::errors::sdk_error::SdkError;
 use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
-use crate::sdk_error::SdkError;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::{broadcast, mpsc};

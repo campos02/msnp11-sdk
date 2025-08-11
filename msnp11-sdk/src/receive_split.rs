@@ -1,4 +1,4 @@
-use crate::sdk_error::SdkError;
+use crate::errors::sdk_error::SdkError;
 use core::str;
 use tokio::io::AsyncReadExt;
 use tokio::net::tcp::OwnedReadHalf;

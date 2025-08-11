@@ -1,4 +1,5 @@
-use crate::sdk_error::SdkError;
+use crate::errors::p2p_error::P2pError;
+use crate::errors::sdk_error::SdkError;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
@@ -31,20 +32,23 @@ impl DisplayPictureSession {
         let Some(branch) =
             invite.find(|parameter| parameter.starts_with("Via: MSNSLP/1.0/TLP ;branch={"))
         else {
-            return Err(SdkError::P2PInviteError.into());
+            return Err(P2pError::P2pInvite.into());
         };
+
         let branch = branch
             .replace("Via: MSNSLP/1.0/TLP ;branch={", "")
             .replace("}", "");
 
         let Some(call_id) = invite.find(|parameter| parameter.starts_with("Call-ID: {")) else {
-            return Err(SdkError::P2PInviteError.into());
+            return Err(P2pError::P2pInvite.into());
         };
+
         let call_id = call_id.replace("Call-ID: {", "").replace("}", "");
 
         let Some(session_id) = invite.find(|parameter| parameter.starts_with("SessionID: ")) else {
-            return Err(SdkError::P2PInviteError.into());
+            return Err(P2pError::P2pInvite.into());
         };
+
         let session_id = session_id.replace("SessionID: ", "").parse::<u32>()?;
 
         Ok(Self {

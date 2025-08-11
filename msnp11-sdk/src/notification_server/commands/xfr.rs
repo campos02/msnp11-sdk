@@ -1,11 +1,11 @@
+use crate::errors::sdk_error::SdkError;
 use crate::internal_event::InternalEvent;
-use crate::sdk_error::SdkError;
 use crate::switchboard_server::switchboard::Switchboard;
 use crate::user_data::UserData;
 use log::trace;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, RwLock};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{RwLock, broadcast, mpsc};
 
 pub async fn send(
     tr_id: &AtomicU32,

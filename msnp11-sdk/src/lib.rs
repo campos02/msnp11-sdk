@@ -52,6 +52,7 @@
 
 pub mod client;
 pub mod enums;
+mod errors;
 pub mod event_handler;
 mod exports;
 mod internal_event;
@@ -59,7 +60,6 @@ pub mod models;
 mod notification_server;
 mod passport_auth;
 mod receive_split;
-pub mod sdk_error;
 pub mod switchboard_server;
 mod user_data;
 

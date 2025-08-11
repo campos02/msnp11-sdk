@@ -1,6 +1,6 @@
 use crate::enums::msnp_status::MsnpStatus;
+use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
-use crate::sdk_error::SdkError;
 use crate::{Event, MsnpList, PersonalMessage, Switchboard};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -156,8 +156,8 @@ impl Client {
 
     /// Sets the user's display picture, returning a standard base64 encoded hash of it.
     /// This method uses the picture's binary data, and scaling down beforehand to a size like 200x200 is recommended.
-    pub fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<String, SdkError> {
-        self.inner.set_display_picture(display_picture)
+    pub async fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<String, SdkError> {
+        self.inner.set_display_picture(display_picture).await
     }
 
     /// Disconnects from the server.

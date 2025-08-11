@@ -11,16 +11,12 @@ pub struct Presence {
 }
 
 impl Presence {
-    pub(crate) fn new(
-        status: MsnpStatus,
-        msn_object: Option<MsnObject>,
-        msn_object_string: Option<String>,
-    ) -> Self {
+    pub(crate) fn new_without_object(status: MsnpStatus) -> Self {
         Self {
             status,
             client_id: 0x40000000,
-            msn_object,
-            msn_object_string,
+            msn_object: None,
+            msn_object_string: None,
         }
     }
 }

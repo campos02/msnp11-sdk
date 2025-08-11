@@ -1,6 +1,7 @@
 use crate::enums::event::Event;
 use crate::enums::msnp_list::MsnpList;
 use crate::enums::msnp_status::MsnpStatus;
+use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
@@ -11,18 +12,17 @@ use crate::notification_server::commands::{
 use crate::notification_server::event_matcher::{into_event, into_internal_event};
 use crate::passport_auth::PassportAuth;
 use crate::receive_split::receive_split;
-use crate::sdk_error::SdkError;
 use crate::switchboard_server::switchboard::Switchboard;
 use crate::user_data::UserData;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use log::{error, trace};
+use std::sync::Arc;
 use std::sync::atomic::AtomicU32;
-use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpStream, lookup_host};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{RwLock, broadcast, mpsc};
 
 /// Defines the client itself, all Notification Server actions are done through an instance of this struct.
 pub struct Client {
@@ -141,20 +141,6 @@ impl Client {
         let mut internal_rx = self.internal_tx.subscribe();
 
         let user_data = self.user_data.clone();
-        let user_email;
-        {
-            let user_data = self
-                .user_data
-                .read()
-                .or(Err(SdkError::CouldNotGetUserData))?;
-
-            user_email = user_data
-                .email
-                .as_ref()
-                .ok_or(SdkError::NotLoggedIn)?
-                .clone();
-        }
-
         tokio::spawn(async move {
             while let Ok(event) = internal_rx.recv().await {
                 if let InternalEvent::SwitchboardInvitation {
@@ -173,7 +159,10 @@ impl Client {
                     .await;
 
                     if let Ok(switchboard) = switchboard {
-                        if switchboard.answer(&user_email, &session_id).await.is_ok() {
+                        let user_data = user_data.read().await;
+                        if let Some(ref user_email) = user_data.email
+                            && switchboard.answer(user_email, &session_id).await.is_ok()
+                        {
                             if let Err(error) = event_tx
                                 .send(Event::SessionAnswered(Arc::new(switchboard)))
                                 .await
@@ -262,11 +251,7 @@ impl Client {
         usr_s::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &token).await?;
 
         {
-            let mut user_data = self
-                .user_data
-                .write()
-                .or(Err(SdkError::CouldNotSetUserData))?;
-
+            let mut user_data = self.user_data.write().await;
             user_data.email = Some(email);
         }
 
@@ -281,28 +266,18 @@ impl Client {
 
     /// Sets the user's presence status.
     pub async fn set_presence(&self, presence: MsnpStatus) -> Result<(), SdkError> {
-        let msn_object;
-        {
-            let user_data = self
-                .user_data
-                .read()
-                .or(Err(SdkError::CouldNotSetUserData))?;
-
-            msn_object = user_data.msn_object.clone();
-        }
         let mut internal_rx = self.internal_tx.subscribe();
+        let presence = Presence::new_without_object(presence);
+        let user_data = self.user_data.read().await;
 
-        let presence = Presence::new(
-            presence,
-            if let Some(msn_object) = &msn_object {
-                quick_xml::de::from_str(msn_object).ok()
-            } else {
-                None
-            },
-            msn_object,
-        );
-
-        chg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &presence).await
+        chg::send(
+            &self.tr_id,
+            &self.ns_tx,
+            &mut internal_rx,
+            &presence,
+            user_data.msn_object.as_deref(),
+        )
+        .await
     }
 
     /// Sets the user's personal message.
@@ -464,20 +439,6 @@ impl Client {
     /// Creates and returns a new Switchboard session with the specified contact.
     pub async fn create_session(&self, email: &str) -> Result<Switchboard, SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        let user_email;
-        {
-            let user_data = self
-                .user_data
-                .read()
-                .or(Err(SdkError::CouldNotGetUserData))?;
-
-            user_email = user_data
-                .email
-                .as_ref()
-                .ok_or(SdkError::NotLoggedIn)?
-                .clone();
-        }
-
         let switchboard = xfr::send(
             &self.tr_id,
             &self.ns_tx,
@@ -486,19 +447,19 @@ impl Client {
         )
         .await?;
 
-        switchboard.login(&user_email).await?;
+        let user_data = self.user_data.read().await;
+        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+
+        switchboard.login(user_email).await?;
         switchboard.invite(email).await?;
+
         Ok(switchboard)
     }
 
     /// Sets the user's display picture, returning a standard base64 encoded hash of it.
     /// This method uses the picture's binary data, and scaling down beforehand to a size like 200x200 is recommended.
-    pub fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<String, SdkError> {
-        let mut user_data = self
-            .user_data
-            .write()
-            .or(Err(SdkError::CouldNotSetUserData))?;
-
+    pub async fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<String, SdkError> {
+        let mut user_data = self.user_data.write().await;
         let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
 
         let mut hash = sha1_smol::Sha1::new();

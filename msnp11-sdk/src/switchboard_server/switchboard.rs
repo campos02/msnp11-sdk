@@ -1,25 +1,25 @@
 use crate::enums::event::Event;
+use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
 use crate::receive_split::receive_split;
-use crate::sdk_error::SdkError;
 use crate::switchboard_server::commands::{ans, cal, msg, usr};
 use crate::switchboard_server::event_matcher::{into_event, into_internal_event};
+use crate::switchboard_server::p2p;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 use crate::switchboard_server::p2p::display_picture_session::DisplayPictureSession;
 use crate::user_data::UserData;
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::DekuContainerRead;
 use log::{error, trace};
 use std::error::Error;
 use std::io::Cursor;
+use std::sync::Arc;
 use std::sync::atomic::AtomicU32;
-use std::sync::{Arc, RwLock};
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{RwLock, broadcast, mpsc};
 
 /// Represents a messaging session with one or more contacts. The official MSN clients usually create a new session every time a conversation
 /// window is opened and leave it once it's closed.
@@ -99,15 +99,7 @@ impl Switchboard {
         let mut command_internal_rx = self.internal_tx.subscribe();
 
         let tr_id = self.tr_id.clone();
-        let user_data;
-        {
-            let user_data_lock = self
-                .user_data
-                .read()
-                .or(Err(SdkError::CouldNotGetUserData))?;
-
-            user_data = user_data_lock.clone();
-        }
+        let user_data = self.user_data.clone();
 
         tokio::spawn(async move {
             while let Ok(event) = internal_rx.recv().await {
@@ -116,165 +108,30 @@ impl Switchboard {
                         destination,
                         message: invite,
                     } => {
-                        let Some(ref user_email) = user_data.email else {
-                            continue;
-                        };
-
-                        if destination != *user_email {
-                            continue;
-                        }
-
-                        let invite_string = unsafe { str::from_utf8_unchecked(invite.as_slice()) };
-                        let mut invite_parameters = invite_string.lines();
-
-                        invite_parameters.next();
-                        let Some(to) = invite_parameters.next() else {
-                            continue;
-                        };
-
-                        if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
-                            continue;
-                        }
-
-                        let Some(from) = invite_parameters.next() else {
-                            continue;
-                        };
-
-                        let from = from.replace("From: <msnmsgr:", "").replace(">", "");
-                        let Ok(session) = DisplayPictureSession::new_from_invite(&invite) else {
-                            continue;
-                        };
-
-                        let Ok(ack_payload) = DisplayPictureSession::acknowledge(&invite) else {
-                            continue;
-                        };
-
-                        if msg::send_p2p(
-                            &tr_id,
-                            &sb_tx,
+                        let _ = p2p::send_display_picture::handle_invite(
+                            destination,
+                            invite,
+                            user_data.clone(),
                             &mut command_internal_rx,
-                            ack_payload,
-                            from.as_str(),
+                            tr_id.clone(),
+                            sb_tx.clone(),
                         )
-                        .await
-                        .is_err()
-                        {
-                            continue;
-                        }
-
-                        let Some(context) =
-                            invite_parameters.find(|line| line.contains("Context: "))
-                        else {
-                            continue;
-                        };
-
-                        let context = context.replace("Context: ", "");
-                        let Some(msn_object) = user_data.msn_object.as_ref() else {
-                            continue;
-                        };
-
-                        if context != STANDARD.encode((msn_object.to_owned() + "\0").as_bytes()) {
-                            continue;
-                        }
-
-                        let Ok(ok_payload) = session.ok(from.as_str(), to) else {
-                            continue;
-                        };
-
-                        if msg::send_p2p(
-                            &tr_id,
-                            &sb_tx,
-                            &mut command_internal_rx,
-                            ok_payload,
-                            from.as_str(),
-                        )
-                        .await
-                        .is_err()
-                        {
-                            continue;
-                        }
-
-                        let Ok(preparation_payload) = session.data_preparation() else {
-                            continue;
-                        };
-
-                        if msg::send_p2p(
-                            &tr_id,
-                            &sb_tx,
-                            &mut command_internal_rx,
-                            preparation_payload,
-                            from.as_str(),
-                        )
-                        .await
-                        .is_err()
-                        {
-                            continue;
-                        }
-
-                        let Some(display_picture) = user_data.display_picture.as_ref() else {
-                            continue;
-                        };
-
-                        let Ok(data_payloads) = session.data(display_picture) else {
-                            continue;
-                        };
-
-                        for data_payload in data_payloads {
-                            if msg::send_p2p(
-                                &tr_id,
-                                &sb_tx,
-                                &mut command_internal_rx,
-                                data_payload,
-                                from.as_str(),
-                            )
-                            .await
-                            .is_err()
-                            {
-                                continue;
-                            }
-                        }
+                        .await;
                     }
 
                     InternalEvent::P2PBye {
                         destination,
                         message: bye,
                     } => {
-                        let Some(ref user_email) = user_data.email else {
-                            continue;
-                        };
-
-                        if destination != *user_email {
-                            continue;
-                        }
-
-                        let bye_string =
-                            unsafe { str::from_utf8_unchecked(bye.as_slice()) }.to_string();
-
-                        let mut bye_parameters = bye_string.lines();
-                        bye_parameters.next();
-                        bye_parameters.next();
-
-                        let Some(from) = bye_parameters.next() else {
-                            continue;
-                        };
-
-                        let from = from.replace("From: <msnmsgr:", "").replace(">", "");
-                        let Ok(ack_payload) = DisplayPictureSession::acknowledge(&bye) else {
-                            continue;
-                        };
-
-                        if msg::send_p2p(
-                            &tr_id,
-                            &sb_tx,
+                        let _ = p2p::send_display_picture::handle_bye(
+                            destination,
+                            bye,
+                            user_data.clone(),
                             &mut command_internal_rx,
-                            ack_payload,
-                            from.as_str(),
+                            tr_id.clone(),
+                            sb_tx.clone(),
                         )
-                        .await
-                        .is_err()
-                        {
-                            continue;
-                        }
+                        .await;
                     }
 
                     _ => (),
@@ -317,12 +174,9 @@ impl Switchboard {
 
         self.handle_p2p_events().await?;
 
-        let mut session_id_lock = self
-            .session_id
-            .write()
-            .or(Err(SdkError::CouldNotSetSessionId))?;
-
+        let mut session_id_lock = self.session_id.write().await;
         *session_id_lock = Some(session_id.to_owned());
+
         Ok(())
     }
 
@@ -359,22 +213,15 @@ impl Switchboard {
         let mut internal_rx = self.internal_tx.subscribe();
 
         let session_id = Some(cal::send(&self.tr_id, &self.sb_tx, &mut internal_rx, email).await?);
-        let mut session_id_lock = self
-            .session_id
-            .write()
-            .or(Err(SdkError::CouldNotSetSessionId))?;
+        let mut session_id_lock = self.session_id.write().await;
 
         *session_id_lock = session_id;
         Ok(())
     }
 
     /// Returns the session ID, if defined.
-    pub fn get_session_id(&self) -> Result<String, SdkError> {
-        let session_id = self
-            .session_id
-            .read()
-            .or(Err(SdkError::CouldNotGetSessionId))?;
-
+    pub async fn get_session_id(&self) -> Result<String, SdkError> {
+        let session_id = self.session_id.read().await;
         session_id.clone().ok_or(SdkError::CouldNotGetSessionId)
     }
 
@@ -402,38 +249,35 @@ impl Switchboard {
         email: &str,
         msn_object: &str,
     ) -> Result<(), SdkError> {
-        let user_email;
-        {
-            let user_data = self
-                .user_data
-                .read()
-                .or(Err(SdkError::CouldNotGetUserData))?;
-
-            user_email = user_data
-                .email
-                .as_ref()
-                .ok_or(SdkError::NotLoggedIn)?
-                .clone();
-        }
-
         let mut internal_rx = self.internal_tx.subscribe();
         let mut session = DisplayPictureSession::new();
-        let invite = session.invite(email, &user_email, msn_object)?;
+
+        let invite;
+        {
+            let user_data = self.user_data.read().await;
+            let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+            invite = session.invite(email, user_email, msn_object)?
+        }
 
         {
             let mut internal_rx = self.internal_tx.subscribe();
             msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, invite, email).await?;
         }
 
-        let mut picture: Vec<u8> = Vec::new();
+        let mut picture = Vec::new();
         loop {
             match internal_rx.recv().await.or(Err(SdkError::ReceivingError))? {
                 InternalEvent::P2PShouldAck {
                     destination,
                     message,
                 } => {
-                    if destination != *user_email {
-                        continue;
+                    {
+                        let user_data = self.user_data.read().await;
+                        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+
+                        if destination != *user_email {
+                            continue;
+                        }
                     }
 
                     let mut internal_rx = self.internal_tx.subscribe();
@@ -445,20 +289,29 @@ impl Switchboard {
                     destination,
                     message: invite,
                 } => {
-                    if destination != *user_email {
-                        continue;
+                    {
+                        let user_data = self.user_data.read().await;
+                        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+
+                        if destination != *user_email {
+                            continue;
+                        }
                     }
 
                     let mut internal_rx = self.internal_tx.subscribe();
-
                     let invite_string = unsafe { str::from_utf8_unchecked(invite.as_slice()) };
                     let mut invite_parameters = invite_string.lines();
 
                     invite_parameters.next();
                     let to = invite_parameters.next().ok_or(SdkError::P2PInviteError)?;
 
-                    if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
-                        continue;
+                    {
+                        let user_data = self.user_data.read().await;
+                        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+
+                        if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
+                            continue;
+                        }
                     }
 
                     let from = invite_parameters
@@ -482,8 +335,13 @@ impl Switchboard {
                     destination,
                     message: data,
                 } => {
-                    if destination != *user_email {
-                        continue;
+                    {
+                        let user_data = self.user_data.read().await;
+                        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+
+                        if destination != *user_email {
+                            continue;
+                        }
                     }
 
                     let binary_header = data.get(..48).ok_or(SdkError::BinaryHeaderReadingError)?;
@@ -514,9 +372,14 @@ impl Switchboard {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
-        let bye = session.bye(email, &user_email)?;
-        msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, bye, email).await?;
+        let bye;
+        {
+            let user_data = self.user_data.read().await;
+            let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+            bye = session.bye(email, user_email)?;
+        }
 
+        msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, bye, email).await?;
         self.event_tx
             .send(Event::DisplayPicture {
                 email: email.to_owned(),
