@@ -6,66 +6,62 @@ use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::{broadcast, mpsc};
 
-pub struct Chg;
+pub async fn send(
+    tr_id: &AtomicU32,
+    ns_tx: &mpsc::Sender<Vec<u8>>,
+    internal_rx: &mut broadcast::Receiver<InternalEvent>,
+    presence: &Presence,
+) -> Result<(), SdkError> {
+    tr_id.fetch_add(1, Ordering::SeqCst);
+    let tr_id = tr_id.load(Ordering::SeqCst);
 
-impl Chg {
-    pub async fn send(
-        tr_id: &AtomicU32,
-        ns_tx: &mpsc::Sender<Vec<u8>>,
-        internal_rx: &mut broadcast::Receiver<InternalEvent>,
-        presence: &Presence,
-    ) -> Result<(), SdkError> {
-        tr_id.fetch_add(1, Ordering::SeqCst);
-        let tr_id = tr_id.load(Ordering::SeqCst);
+    let status = match presence.status {
+        MsnpStatus::Online => "NLN",
+        MsnpStatus::Busy => "BSY",
+        MsnpStatus::Away => "AWY",
+        MsnpStatus::Idle => "IDL",
+        MsnpStatus::OutToLunch => "LUN",
+        MsnpStatus::OnThePhone => "PHN",
+        MsnpStatus::BeRightBack => "BRB",
+        MsnpStatus::AppearOffline => "HDN",
+    };
 
-        let status = match presence.status {
-            MsnpStatus::Online => "NLN",
-            MsnpStatus::Busy => "BSY",
-            MsnpStatus::Away => "AWY",
-            MsnpStatus::Idle => "IDL",
-            MsnpStatus::OutToLunch => "LUN",
-            MsnpStatus::OnThePhone => "PHN",
-            MsnpStatus::BeRightBack => "BRB",
-            MsnpStatus::AppearOffline => "HDN",
-        };
+    let mut command = format!("CHG {tr_id} {status} {}\r\n", presence.client_id);
+    if let Some(msn_object) = &presence.msn_object_string {
+        command = command.replace(
+            "\r\n",
+            format!(" {}\r\n", urlencoding::encode(msn_object)).as_str(),
+        );
+    }
 
-        let mut command = format!("CHG {tr_id} {status} {}\r\n", presence.client_id);
-        if let Some(msn_object) = &presence.msn_object_string {
-            command = command.replace(
-                "\r\n",
-                format!(" {}\r\n", urlencoding::encode(msn_object)).as_str(),
-            );
-        }
+    ns_tx
+        .send(command.as_bytes().to_vec())
+        .await
+        .or(Err(SdkError::TransmittingError))?;
 
-        ns_tx
-            .send(command.as_bytes().to_vec())
-            .await
-            .or(Err(SdkError::TransmittingError))?;
+    trace!("C: {command}");
 
-        trace!("C: {command}");
+    loop {
+        if let InternalEvent::ServerReply(reply) =
+            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        {
+            trace!("S: {reply}");
 
-        loop {
-            if let InternalEvent::ServerReply(reply) =
-                internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
-            {
-                trace!("S: {reply}");
-
-                let args: Vec<&str> = reply.trim().split(' ').collect();
-                match *args.first().unwrap_or(&"") {
-                    "CHG" => {
-                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                            return Ok(());
-                        }
+            let args: Vec<&str> = reply.trim().split(' ').collect();
+            match *args.first().unwrap_or(&"") {
+                "CHG" => {
+                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
+                        return Ok(());
                     }
-
-                    "201" => {
-                        if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                            return Err(SdkError::InvalidArgument);
-                        }
-                    }
-
-                    _ => (),
                 }
+
+                "201" => {
+                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
+                        return Err(SdkError::InvalidArgument);
+                    }
+                }
+
+                _ => (),
             }
         }
     }

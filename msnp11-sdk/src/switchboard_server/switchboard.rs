@@ -4,10 +4,7 @@ use crate::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
 use crate::receive_split::receive_split;
 use crate::sdk_error::SdkError;
-use crate::switchboard_server::commands::ans::Ans;
-use crate::switchboard_server::commands::cal::Cal;
-use crate::switchboard_server::commands::msg::Msg;
-use crate::switchboard_server::commands::usr::Usr;
+use crate::switchboard_server::commands::{ans, cal, msg, usr};
 use crate::switchboard_server::event_matcher::{into_event, into_internal_event};
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 use crate::switchboard_server::p2p::display_picture_session::DisplayPictureSession;
@@ -152,7 +149,7 @@ impl Switchboard {
                             continue;
                         };
 
-                        if Msg::send_p2p(
+                        if msg::send_p2p(
                             &tr_id,
                             &sb_tx,
                             &mut command_internal_rx,
@@ -184,7 +181,7 @@ impl Switchboard {
                             continue;
                         };
 
-                        if Msg::send_p2p(
+                        if msg::send_p2p(
                             &tr_id,
                             &sb_tx,
                             &mut command_internal_rx,
@@ -201,7 +198,7 @@ impl Switchboard {
                             continue;
                         };
 
-                        if Msg::send_p2p(
+                        if msg::send_p2p(
                             &tr_id,
                             &sb_tx,
                             &mut command_internal_rx,
@@ -223,7 +220,7 @@ impl Switchboard {
                         };
 
                         for data_payload in data_payloads {
-                            if Msg::send_p2p(
+                            if msg::send_p2p(
                                 &tr_id,
                                 &sb_tx,
                                 &mut command_internal_rx,
@@ -266,7 +263,7 @@ impl Switchboard {
                             continue;
                         };
 
-                        if Msg::send_p2p(
+                        if msg::send_p2p(
                             &tr_id,
                             &sb_tx,
                             &mut command_internal_rx,
@@ -290,7 +287,7 @@ impl Switchboard {
 
     pub(crate) async fn login(&self, email: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Usr::send(
+        usr::send(
             &self.tr_id,
             &self.sb_tx,
             &mut internal_rx,
@@ -308,7 +305,7 @@ impl Switchboard {
         session_id: &str,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Ans::send(
+        ans::send(
             &self.tr_id,
             &self.sb_tx,
             &mut internal_rx,
@@ -361,7 +358,7 @@ impl Switchboard {
     pub async fn invite(&self, email: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
 
-        let session_id = Some(Cal::send(&self.tr_id, &self.sb_tx, &mut internal_rx, email).await?);
+        let session_id = Some(cal::send(&self.tr_id, &self.sb_tx, &mut internal_rx, email).await?);
         let mut session_id_lock = self
             .session_id
             .write()
@@ -384,18 +381,18 @@ impl Switchboard {
     /// Sends a plain text message to the session.
     pub async fn send_text_message(&self, message: &PlainText) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Msg::send_text_message(&self.tr_id, &self.sb_tx, &mut internal_rx, message).await
+        msg::send_text_message(&self.tr_id, &self.sb_tx, &mut internal_rx, message).await
     }
 
     /// Sends a nudge to the session.
     pub async fn send_nudge(&self) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Msg::send_nudge(&self.tr_id, &self.sb_tx, &mut internal_rx).await
+        msg::send_nudge(&self.tr_id, &self.sb_tx, &mut internal_rx).await
     }
 
     /// Sends an "is writing..." notification to the session.
     pub async fn send_typing_user(&self, email: &str) -> Result<(), SdkError> {
-        Msg::send_typing_user(&self.tr_id, &self.sb_tx, email).await
+        msg::send_typing_user(&self.tr_id, &self.sb_tx, email).await
     }
 
     /// Requests a contact's display picture and handles the transfer process. A [DisplayPicture][Event::DisplayPicture] event
@@ -425,7 +422,7 @@ impl Switchboard {
 
         {
             let mut internal_rx = self.internal_tx.subscribe();
-            Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, invite, email).await?;
+            msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, invite, email).await?;
         }
 
         let mut picture: Vec<u8> = Vec::new();
@@ -441,7 +438,7 @@ impl Switchboard {
 
                     let mut internal_rx = self.internal_tx.subscribe();
                     let ack = DisplayPictureSession::acknowledge(&message)?;
-                    Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
+                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
                 }
 
                 InternalEvent::P2PInvite {
@@ -477,7 +474,7 @@ impl Switchboard {
                         .decline(from.as_str(), to)
                         .or(Err(SdkError::P2PInviteError))?;
 
-                    Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, decline, email)
+                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, decline, email)
                         .await?;
                 }
 
@@ -503,7 +500,7 @@ impl Switchboard {
 
                     if data_len as u64 == binary_header.total_data_size {
                         let ack = DisplayPictureSession::acknowledge(&data)?;
-                        Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email)
+                        msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email)
                             .await?;
 
                         break;
@@ -518,7 +515,7 @@ impl Switchboard {
         }
 
         let bye = session.bye(email, &user_email)?;
-        Msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, bye, email).await?;
+        msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, bye, email).await?;
 
         self.event_tx
             .send(Event::DisplayPicture {

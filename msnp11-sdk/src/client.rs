@@ -5,24 +5,9 @@ use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
-use crate::notification_server::commands::adc::Adc;
-use crate::notification_server::commands::adg::Adg;
-use crate::notification_server::commands::blp::Blp;
-use crate::notification_server::commands::chg::Chg;
-use crate::notification_server::commands::cvr::Cvr;
-use crate::notification_server::commands::gcf::Gcf;
-use crate::notification_server::commands::gtc::Gtc;
-use crate::notification_server::commands::prp::Prp;
-use crate::notification_server::commands::reg::Reg;
-use crate::notification_server::commands::rem::Rem;
-use crate::notification_server::commands::rmg::Rmg;
-use crate::notification_server::commands::sbp::Sbp;
-use crate::notification_server::commands::syn::Syn;
-use crate::notification_server::commands::usr_i::UsrI;
-use crate::notification_server::commands::usr_s::UsrS;
-use crate::notification_server::commands::uux::Uux;
-use crate::notification_server::commands::ver::Ver;
-use crate::notification_server::commands::xfr::Xfr;
+use crate::notification_server::commands::{
+    adc, adg, blp, chg, cvr, gcf, gtc, prp, reg, rem, rmg, sbp, syn, usr_i, usr_s, uux, ver, xfr,
+};
 use crate::notification_server::event_matcher::{into_event, into_internal_event};
 use crate::passport_auth::PassportAuth;
 use crate::receive_split::receive_split;
@@ -248,8 +233,8 @@ impl Client {
     ) -> Result<Event, SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
 
-        Ver::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
-        Cvr::send(
+        ver::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
+        cvr::send(
             &self.tr_id,
             &self.ns_tx,
             &mut internal_rx,
@@ -260,7 +245,7 @@ impl Client {
         .await?;
 
         let authorization_string =
-            match UsrI::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &email).await? {
+            match usr_i::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &email).await? {
                 InternalEvent::GotAuthorizationString(authorization_string) => authorization_string,
                 InternalEvent::RedirectedTo { server, port } => {
                     return Ok(Event::RedirectedTo { server, port });
@@ -274,7 +259,7 @@ impl Client {
             .get_passport_token(&email, password, &authorization_string)
             .await?;
 
-        UsrS::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &token).await?;
+        usr_s::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &token).await?;
 
         {
             let mut user_data = self
@@ -285,8 +270,8 @@ impl Client {
             user_data.email = Some(email);
         }
 
-        Syn::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
-        Gcf::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
+        syn::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
+        gcf::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
 
         self.handle_switchboard_invitations().await?;
         self.start_pinging();
@@ -317,7 +302,7 @@ impl Client {
             msn_object,
         );
 
-        Chg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &presence).await
+        chg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &presence).await
     }
 
     /// Sets the user's personal message.
@@ -326,13 +311,13 @@ impl Client {
         personal_message: &PersonalMessage,
     ) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Uux::send(&self.tr_id, &self.ns_tx, &mut internal_rx, personal_message).await
+        uux::send(&self.tr_id, &self.ns_tx, &mut internal_rx, personal_message).await
     }
 
     /// Sets the user's display name.
     pub async fn set_display_name(&self, display_name: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Prp::send(&self.tr_id, &self.ns_tx, &mut internal_rx, display_name).await
+        prp::send(&self.tr_id, &self.ns_tx, &mut internal_rx, display_name).await
     }
 
     /// Sets a contact's display name.
@@ -342,7 +327,7 @@ impl Client {
         display_name: &str,
     ) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Sbp::send(
+        sbp::send(
             &self.tr_id,
             &self.ns_tx,
             &mut internal_rx,
@@ -360,7 +345,7 @@ impl Client {
         list: MsnpList,
     ) -> Result<Event, SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Adc::send(
+        adc::send(
             &self.tr_id,
             &self.ns_tx,
             &mut internal_rx,
@@ -375,19 +360,19 @@ impl Client {
     /// [remove_contact_from_forward_list][Client::remove_contact_from_forward_list]).
     pub async fn remove_contact(&self, email: &str, list: MsnpList) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Rem::send(&self.tr_id, &self.ns_tx, &mut internal_rx, email, list).await
+        rem::send(&self.tr_id, &self.ns_tx, &mut internal_rx, email, list).await
     }
 
     /// Removes a contact from the forward list.
     pub async fn remove_contact_from_forward_list(&self, guid: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Rem::send_with_forward_list(&self.tr_id, &self.ns_tx, &mut internal_rx, guid).await
+        rem::send_with_forward_list(&self.tr_id, &self.ns_tx, &mut internal_rx, guid).await
     }
 
     /// Blocks a contact.
     pub async fn block_contact(&self, email: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Adc::send(
+        adc::send(
             &self.tr_id,
             &self.ns_tx,
             &mut internal_rx,
@@ -397,7 +382,7 @@ impl Client {
         )
         .await?;
 
-        Rem::send(
+        rem::send(
             &self.tr_id,
             &self.ns_tx,
             &mut internal_rx,
@@ -410,7 +395,7 @@ impl Client {
     /// Unblocks a contact.
     pub async fn unblock_contact(&self, email: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Adc::send(
+        adc::send(
             &self.tr_id,
             &self.ns_tx,
             &mut internal_rx,
@@ -420,7 +405,7 @@ impl Client {
         )
         .await?;
 
-        Rem::send(
+        rem::send(
             &self.tr_id,
             &self.ns_tx,
             &mut internal_rx,
@@ -433,25 +418,25 @@ impl Client {
     /// Creates a new contact group.
     pub async fn create_group(&self, name: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Adg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, name).await
+        adg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, name).await
     }
 
     /// Deletes a contact group.
     pub async fn delete_group(&self, guid: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Rmg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, guid).await
+        rmg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, guid).await
     }
 
     /// Renames a contact group.
     pub async fn rename_group(&self, guid: &str, new_name: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Reg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, new_name).await
+        reg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, new_name).await
     }
 
     /// Adds a contact to a group.
     pub async fn add_contact_to_group(&self, guid: &str, group_guid: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Adc::send_with_group(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, group_guid).await
+        adc::send_with_group(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, group_guid).await
     }
 
     /// Removes a contact from a group.
@@ -461,19 +446,19 @@ impl Client {
         group_guid: &str,
     ) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Rem::send_with_group(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, group_guid).await
+        rem::send_with_group(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, group_guid).await
     }
 
     /// Sets the GTC value, which can be either `A` or `N`.
     pub async fn set_gtc(&self, gtc: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Gtc::send(&self.tr_id, &self.ns_tx, &mut internal_rx, gtc).await
+        gtc::send(&self.tr_id, &self.ns_tx, &mut internal_rx, gtc).await
     }
 
     /// Sets the GTC value, which can be either `AL` or `BL`.
     pub async fn set_blp(&self, blp: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        Blp::send(&self.tr_id, &self.ns_tx, &mut internal_rx, blp).await
+        blp::send(&self.tr_id, &self.ns_tx, &mut internal_rx, blp).await
     }
 
     /// Creates and returns a new Switchboard session with the specified contact.
@@ -493,7 +478,7 @@ impl Client {
                 .clone();
         }
 
-        let switchboard = Xfr::send(
+        let switchboard = xfr::send(
             &self.tr_id,
             &self.ns_tx,
             &mut internal_rx,
