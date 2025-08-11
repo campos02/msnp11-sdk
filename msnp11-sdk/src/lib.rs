@@ -69,6 +69,7 @@ pub use client::Client;
 pub use enums::event::Event;
 pub use enums::msnp_list::MsnpList;
 pub use enums::msnp_status::MsnpStatus;
+pub use errors::sdk_error::SdkError;
 pub use models::msn_object::MsnObject;
 pub use models::personal_message::PersonalMessage;
 pub use models::plain_text::PlainText;
