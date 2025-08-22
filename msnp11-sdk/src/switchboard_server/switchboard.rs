@@ -42,9 +42,9 @@ impl Switchboard {
         cki_string: &str,
         user_data: Arc<RwLock<UserData>>,
     ) -> Result<Self, SdkError> {
-        let (event_tx, event_rx) = async_channel::bounded::<Event>(32);
-        let (sb_tx, mut sb_rx) = mpsc::channel::<Vec<u8>>(32);
-        let (internal_tx, _) = broadcast::channel::<InternalEvent>(128);
+        let (event_tx, event_rx) = async_channel::unbounded();
+        let (sb_tx, mut sb_rx) = mpsc::channel::<Vec<u8>>(256);
+        let (internal_tx, _) = broadcast::channel::<InternalEvent>(256);
 
         let socket = TcpStream::connect(format!("{server}:{port}"))
             .await
