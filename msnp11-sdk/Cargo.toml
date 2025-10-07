@@ -11,7 +11,7 @@ readme = "../README.md"
 tokio = { version = "1", features = ["rt-multi-thread", "io-util", "net", "macros", "sync", "time"] }
 base64 = "0.22.1"
 log = { version = "0.4.27", features = ["std"] }
-reqwest = "0.12.15"
+reqwest = { version = "0.12.15", features = ["charset", "http2", "rustls-tls"], default-features = false }
 quick-xml = { version = "0.38.0", features = ["serialize"] }
 serde = { version = "1.0.219", features = ["derive"] }
 urlencoding = "2.1.3"
