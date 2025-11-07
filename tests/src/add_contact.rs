@@ -1,7 +1,5 @@
 #[tokio::test]
 async fn add_contact() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
-
     let mut client = msnp11_sdk::client::Client::new("127.0.0.1", 1863)
         .await
         .unwrap();

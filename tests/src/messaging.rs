@@ -1,7 +1,5 @@
 #[tokio::test]
 async fn create_session() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
-
     let mut client = msnp11_sdk::client::Client::new("127.0.0.1", 1863)
         .await
         .unwrap();
@@ -60,7 +58,6 @@ async fn create_session() {
         .unwrap();
 
     switchboard.send_text_message(&message).await.unwrap();
-
     switchboard.add_event_handler_closure(|event| async {
         match event {
             msnp11_sdk::enums::event::Event::ParticipantInSwitchboard { email } => {
@@ -92,8 +89,6 @@ async fn create_session() {
 
 #[tokio::test]
 async fn join_session() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
-
     let mut client = msnp11_sdk::client::Client::new("127.0.0.1", 1863)
         .await
         .unwrap();
@@ -138,7 +133,6 @@ async fn join_session() {
 
     // GTC abuse from the mock server
     client.set_gtc(&"ReceiveRNG".to_string()).await.unwrap();
-
     client.add_event_handler_closure(|event| async {
         match event {
             msnp11_sdk::enums::event::Event::SessionAnswered(switchboard) => {
