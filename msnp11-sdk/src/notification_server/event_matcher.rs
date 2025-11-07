@@ -126,20 +126,51 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
             }
         }
 
-        "NLN" | "ILN" => {
-            let command_type = args.first()?;
-            let base_index = if *command_type == "ILN" { 1 } else { 0 };
-            let email = args.get(base_index + 2)?;
-
-            let msn_object = if *command_type == "ILN" && args.len() > 6 {
+        "ILN" => {
+            let email = args.get(3)?;
+            let msn_object = if args.len() > 6 {
                 urlencoding::decode(args[6]).ok().map(String::from)
-            } else if *command_type == "NLN" && args.len() > 5 {
+            } else {
+                None
+            };
+
+            let status = match *args.get(2)? {
+                "BSY" => MsnpStatus::Busy,
+                "AWY" => MsnpStatus::Away,
+                "IDL" => MsnpStatus::Idle,
+                "LUN" => MsnpStatus::OutToLunch,
+                "PHN" => MsnpStatus::OnThePhone,
+                "BRB" => MsnpStatus::BeRightBack,
+                _ => MsnpStatus::Online,
+            };
+
+            Some(Event::InitialPresenceUpdate {
+                email: email.to_string(),
+                display_name: urlencoding::decode(args.get(4).unwrap_or(email))
+                    .unwrap_or(Cow::from(*email))
+                    .to_string(),
+                presence: Presence {
+                    status,
+                    client_id: args.get(5).unwrap_or(&"").parse().unwrap_or(0),
+                    msn_object: if let Some(msn_object) = &msn_object {
+                        quick_xml::de::from_str(msn_object).ok()
+                    } else {
+                        None
+                    },
+                    msn_object_string: msn_object,
+                },
+            })
+        }
+
+        "NLN" => {
+            let email = args.get(2)?;
+            let msn_object = if args.len() > 5 {
                 urlencoding::decode(args[5]).ok().map(String::from)
             } else {
                 None
             };
 
-            let status = match *args.get(base_index + 1)? {
+            let status = match *args.get(1)? {
                 "BSY" => MsnpStatus::Busy,
                 "AWY" => MsnpStatus::Away,
                 "IDL" => MsnpStatus::Idle,
@@ -151,12 +182,12 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
 
             Some(Event::PresenceUpdate {
                 email: email.to_string(),
-                display_name: urlencoding::decode(args.get(base_index + 3).unwrap_or(email))
+                display_name: urlencoding::decode(args.get(3).unwrap_or(email))
                     .unwrap_or(Cow::from(*email))
                     .to_string(),
                 presence: Presence {
                     status,
-                    client_id: args.get(base_index + 4).unwrap_or(&"").parse().unwrap_or(0),
+                    client_id: args.get(4).unwrap_or(&"").parse().unwrap_or(0),
                     msn_object: if let Some(msn_object) = &msn_object {
                         quick_xml::de::from_str(msn_object).ok()
                     } else {

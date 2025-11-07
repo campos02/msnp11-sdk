@@ -42,6 +42,13 @@ pub enum Event {
         groups: Vec<String>,
     },
 
+    /// Contact presence update sent when setting a user's presence for the first time.
+    InitialPresenceUpdate {
+        email: String,
+        display_name: String,
+        presence: Presence,
+    },
+
     /// Contact presence information update.
     PresenceUpdate {
         email: String,
