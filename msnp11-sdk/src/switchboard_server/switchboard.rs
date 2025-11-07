@@ -63,11 +63,11 @@ impl Switchboard {
                     }
 
                     let event = into_event(&message);
-                    if let Some(event) = event {
-                        if let Err(error) = event_task_tx.send(event).await {
-                            error!("{error}");
-                            break 'outer;
-                        }
+                    if let Some(event) = event
+                        && let Err(error) = event_task_tx.send(event).await
+                    {
+                        error!("{error}");
+                        break 'outer;
                     }
                 }
             }
@@ -186,7 +186,6 @@ impl Switchboard {
         .await?;
 
         self.handle_p2p_events().await?;
-
         let mut session_id_lock = self.session_id.write().await;
         *session_id_lock = Some(session_id.to_owned());
 

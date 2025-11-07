@@ -178,13 +178,11 @@ impl Client {
                         let user_data = user_data.read().await;
                         if let Some(ref user_email) = user_data.email
                             && switchboard.answer(user_email, &session_id).await.is_ok()
-                        {
-                            if let Err(error) = event_tx
+                            && let Err(error) = event_tx
                                 .send(Event::SessionAnswered(Arc::new(switchboard)))
                                 .await
-                            {
-                                error!("{error}");
-                            }
+                        {
+                            error!("{error}");
                         }
                     }
                 }
@@ -276,7 +274,6 @@ impl Client {
 
         self.handle_switchboard_invitations().await?;
         self.start_pinging();
-
         Ok(Event::Authenticated)
     }
 
@@ -468,7 +465,6 @@ impl Client {
 
         switchboard.login(user_email).await?;
         switchboard.invite(email).await?;
-
         Ok(switchboard)
     }
 
