@@ -51,9 +51,9 @@ impl Switchboard {
             .or(Err(SdkError::CouldNotConnectToServer))?;
 
         let (mut rd, mut wr) = socket.into_split();
-
         let internal_task_tx = internal_tx.clone();
         let event_task_tx = event_tx.clone();
+
         tokio::spawn(async move {
             'outer: while let Ok(messages) = receive_split(&mut rd).await {
                 for message in messages {
@@ -71,14 +71,27 @@ impl Switchboard {
                     }
                 }
             }
+
+            if let Err(error) = event_task_tx.send(Event::Disconnected).await {
+                error!("{error}");
+            }
+
+            event_task_tx.close();
         });
 
+        let event_task_tx = event_tx.clone();
         tokio::spawn(async move {
             while let Some(message) = sb_rx.recv().await {
                 if let Err(error) = wr.write_all(message.as_slice()).await {
                     error!("{error}");
                 }
             }
+
+            if let Err(error) = event_task_tx.send(Event::Disconnected).await {
+                error!("{error}");
+            }
+
+            event_task_tx.close();
         });
 
         Ok(Self {
