@@ -1,9 +1,9 @@
 use crate::errors::p2p_error::P2pError;
 use crate::errors::sdk_error::SdkError;
 use crate::internal_event::InternalEvent;
+use crate::models::user_data::UserData;
 use crate::switchboard_server::commands::msg;
 use crate::switchboard_server::p2p::display_picture_session::DisplayPictureSession;
-use crate::user_data::UserData;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use std::sync::Arc;

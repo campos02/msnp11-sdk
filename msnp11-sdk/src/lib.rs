@@ -61,7 +61,6 @@ mod notification_server;
 mod passport_auth;
 mod receive_split;
 pub mod switchboard_server;
-mod user_data;
 
 uniffi::setup_scaffolding!();
 

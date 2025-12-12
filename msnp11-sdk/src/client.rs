@@ -6,6 +6,7 @@ use crate::event_handler::EventHandler;
 use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
+use crate::models::user_data::UserData;
 use crate::notification_server::commands::{
     adc, adg, blp, chg, cvr, gcf, gtc, prp, reg, rem, rmg, sbp, syn, usr_i, usr_s, uux, ver, xfr,
 };
@@ -13,7 +14,6 @@ use crate::notification_server::event_matcher::{into_event, into_internal_event}
 use crate::passport_auth::PassportAuth;
 use crate::receive_split::receive_split;
 use crate::switchboard_server::switchboard::Switchboard;
-use crate::user_data::UserData;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use log::{error, trace};
