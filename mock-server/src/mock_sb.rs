@@ -36,7 +36,7 @@ impl MockSB {
                             break;
                         }
 
-                        let args: Vec<&str> = message_lines[0].trim().split(' ').collect();
+                        let args: Vec<&str> = message_lines[0].split_ascii_whitespace().collect();
                         match args[0] {
                             "MSG" => {
                                 let length = args[3].parse::<usize>().unwrap();

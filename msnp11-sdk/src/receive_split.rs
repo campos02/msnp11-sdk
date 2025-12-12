@@ -21,7 +21,7 @@ pub(crate) async fn receive_split(rd: &mut OwnedReadHalf) -> Result<Vec<Vec<u8>>
         };
 
         let command = command.to_string() + "\r\n";
-        let args: Vec<&str> = command.trim().split(' ').collect();
+        let args: Vec<&str> = command.split_ascii_whitespace().collect();
 
         match *args.first().unwrap_or(&"") {
             "GCF" | "UBX" | "MSG" => {

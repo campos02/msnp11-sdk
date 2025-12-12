@@ -10,7 +10,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
     let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) };
     let command = reply.lines().next().unwrap_or_default().to_string() + "\r\n";
 
-    let args: Vec<&str> = command.trim().split(' ').collect();
+    let args: Vec<&str> = command.split_ascii_whitespace().collect();
     match *args.first().unwrap_or(&"") {
         "MSG" => {
             let payload = reply.replace(command.as_str(), "");
@@ -66,7 +66,7 @@ pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
     let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) }.to_string();
     let command = reply.lines().next().unwrap_or_default().to_string() + "\r\n";
 
-    let args: Vec<&str> = command.trim().split(' ').collect();
+    let args: Vec<&str> = command.split_ascii_whitespace().collect();
     match *args.first().unwrap_or(&"") {
         "MSG" => {
             let payload = reply.replace(command.as_str(), "");

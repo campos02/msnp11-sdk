@@ -11,7 +11,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
     let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) };
     let command = reply.lines().next().unwrap_or_default().to_string() + "\r\n";
 
-    let args: Vec<&str> = command.trim().split(' ').collect();
+    let args: Vec<&str> = command.split_ascii_whitespace().collect();
     match *args.first().unwrap_or(&"") {
         "GTC" => {
             if args.len() < 3
@@ -64,6 +64,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
         }
 
         "LST" => {
+            let email = args.get(1)?;
             let mut lists: Vec<MsnpList> = Vec::new();
             let lists_number_index = if args.len() > 4 { 4 } else { 3 };
 
@@ -72,7 +73,6 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
                 .unwrap_or(&"")
                 .parse::<u32>()
                 .ok()?;
-            let email = args.get(1)?;
 
             if lists_number & 1 == 1 {
                 lists.push(MsnpList::ForwardList);
@@ -200,8 +200,8 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
 
         "UBX" => {
             let email = args.get(1)?;
-
             let payload = reply.replace(command.as_str(), "");
+
             let personal_message =
                 quick_xml::de::from_str(payload.as_str()).unwrap_or(PersonalMessage {
                     psm: "".to_string(),
@@ -284,7 +284,7 @@ pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
     let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) }.to_string();
     let command = reply.lines().next().unwrap_or_default().to_string() + "\r\n";
 
-    let args: Vec<&str> = command.trim().split(' ').collect();
+    let args: Vec<&str> = command.split_ascii_whitespace().collect();
     match *args.first().unwrap_or(&"") {
         "RNG" => {
             let mut server_and_port = args.get(2).unwrap_or(&"").split(":");

@@ -50,7 +50,7 @@ pub async fn send(
         {
             trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
+            let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
                 "ADC" => match list {
                     MsnpList::ForwardList => {
@@ -139,7 +139,7 @@ pub async fn send_with_group(
         {
             trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
+            let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
                 "ADC" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string()

@@ -27,7 +27,7 @@ pub async fn send(
         {
             trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
+            let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             if *args.first().unwrap_or(&"") == "GTC"
                 && *args.get(1).unwrap_or(&"") == tr_id.to_string()
                 && *args.get(2).unwrap_or(&"") == gtc

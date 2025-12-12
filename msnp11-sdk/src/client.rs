@@ -128,7 +128,7 @@ impl Client {
 
                 while let Ok(InternalEvent::ServerReply(reply)) = internal_rx.recv().await {
                     trace!("S: {reply}");
-                    let args: Vec<&str> = reply.trim().split(' ').collect();
+                    let args: Vec<&str> = reply.split_ascii_whitespace().collect();
 
                     if *args.first().unwrap_or(&"") == "QNG" {
                         // Parse and sanity check to avoid spamming the server

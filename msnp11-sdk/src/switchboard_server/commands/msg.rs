@@ -30,7 +30,7 @@ pub async fn send_text_message(
         {
             trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
+            let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
                 "ACK" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
@@ -82,7 +82,7 @@ pub async fn send_nudge(
         {
             trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
+            let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
                 "ACK" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
@@ -165,7 +165,7 @@ pub async fn send_p2p(
         {
             trace!("S: {reply}");
 
-            let args: Vec<&str> = reply.trim().split(' ').collect();
+            let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
                 "ACK" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
