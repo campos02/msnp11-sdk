@@ -1,6 +1,6 @@
+use crate::enums::internal_event::InternalEvent;
 use crate::enums::msnp_status::MsnpStatus;
 use crate::errors::sdk_error::SdkError;
-use crate::internal_event::InternalEvent;
 use crate::models::presence::Presence;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};

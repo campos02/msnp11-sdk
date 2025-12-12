@@ -1,5 +1,5 @@
+use crate::enums::internal_event::InternalEvent;
 use crate::errors::sdk_error::SdkError;
-use crate::internal_event::InternalEvent;
 use crate::models::user_data::UserData;
 use crate::switchboard_server::switchboard::Switchboard;
 use log::trace;

@@ -1,5 +1,5 @@
 use crate::enums::event::Event;
-use crate::internal_event::InternalEvent;
+use crate::enums::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 use core::str;

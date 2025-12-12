@@ -1,5 +1,5 @@
+use crate::enums::internal_event::InternalEvent;
 use crate::errors::sdk_error::SdkError;
-use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};

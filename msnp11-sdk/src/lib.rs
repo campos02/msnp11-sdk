@@ -55,7 +55,6 @@ pub mod enums;
 mod errors;
 pub mod event_handler;
 mod exports;
-mod internal_event;
 pub mod models;
 mod notification_server;
 mod passport_auth;

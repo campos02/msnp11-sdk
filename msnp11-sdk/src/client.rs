@@ -1,9 +1,9 @@
 use crate::enums::event::Event;
+use crate::enums::internal_event::InternalEvent;
 use crate::enums::msnp_list::MsnpList;
 use crate::enums::msnp_status::MsnpStatus;
 use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
-use crate::internal_event::InternalEvent;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
 use crate::models::user_data::UserData;
