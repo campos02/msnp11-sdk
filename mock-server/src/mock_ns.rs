@@ -94,9 +94,10 @@ impl MockNS {
                                 "UBX bob@passport.com 70\r\n<Data><PSM>my msn all ducked</PSM><CurrentMedia></CurrentMedia></Data>",
                             ],
 
-                            "UUX 8 43\r\n<Data><PSM>test</PSM><CurrentMedia/></Data>" => {
-                                &["UUX 8 0\r\n"]
-                            }
+                            "UUX 8 43\r\n<Data><PSM>test</PSM><CurrentMedia/></Data>" => &[
+                                "UUX 8 0\r\n",
+                                "MSG Hotmail Hotmail 88\r\nMIME-Version: 1.0\r\nContent-Type: application/x-msmsgssystemmessage\r\n\r\nType: 1\r\nArg1: 5\r\n",
+                            ],
 
                             "PNG\r\n" => &["QNG 60\r\n"],
                             "ADC 7 FL N=bob@passport.com F=Bob\r\n" => &[

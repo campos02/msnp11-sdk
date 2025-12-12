@@ -246,6 +246,28 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
             }
         }
 
+        "MSG" => {
+            let payload = reply.replace(&command, "");
+            let mut payload_lines = payload.lines();
+            let content_type = payload_lines.nth(1)?;
+
+            if content_type.contains("application/x-msmsgssystemmessage") {
+                let message_type = payload_lines.nth(1)?;
+                let (_, message_type) = message_type.split_once(":")?;
+                let message_type = message_type.trim();
+
+                if message_type == "1" {
+                    let time_remaining = payload_lines.next()?;
+                    let (_, time_remaining) = time_remaining.split_once(":")?;
+
+                    let time_remaining = time_remaining.trim().parse::<u32>().ok()?;
+                    return Some(Event::ServerMaintenance { time_remaining });
+                }
+            }
+
+            None
+        }
+
         "OUT" => {
             if args.len() > 1 && *args.get(1).unwrap_or(&"") == "OTH" {
                 return Some(Event::LoggedInAnotherDevice);
