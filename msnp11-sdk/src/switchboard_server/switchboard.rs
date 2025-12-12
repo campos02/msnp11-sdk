@@ -30,7 +30,7 @@ pub struct Switchboard {
     sb_tx: mpsc::Sender<Vec<u8>>,
     internal_tx: broadcast::Sender<InternalEvent>,
     tr_id: Arc<AtomicU32>,
-    session_id: Arc<RwLock<Option<String>>>,
+    session_id: RwLock<Option<String>>,
     cki_string: String,
     user_data: Arc<RwLock<UserData>>,
 }
@@ -100,7 +100,7 @@ impl Switchboard {
             sb_tx,
             internal_tx,
             tr_id: Arc::new(AtomicU32::new(0)),
-            session_id: Arc::new(RwLock::new(None)),
+            session_id: RwLock::new(None),
             cki_string: cki_string.to_string(),
             user_data,
         })

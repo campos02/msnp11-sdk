@@ -30,7 +30,7 @@ pub struct Client {
     event_rx: async_channel::Receiver<Event>,
     ns_tx: mpsc::Sender<Vec<u8>>,
     internal_tx: broadcast::Sender<InternalEvent>,
-    tr_id: Arc<AtomicU32>,
+    tr_id: AtomicU32,
     user_data: Arc<RwLock<UserData>>,
 }
 
@@ -111,7 +111,7 @@ impl Client {
             event_rx,
             ns_tx,
             internal_tx,
-            tr_id: Arc::new(AtomicU32::new(0)),
+            tr_id: AtomicU32::new(0),
             user_data: Arc::new(RwLock::new(UserData::new())),
         })
     }
