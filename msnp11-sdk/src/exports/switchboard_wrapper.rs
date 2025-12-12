@@ -1,3 +1,5 @@
+use crate::errors::messaging_error::MessagingError;
+use crate::errors::p2p_error::P2pError;
 use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
 use crate::{PlainText, Switchboard};
@@ -38,22 +40,22 @@ impl SwitchboardWrapper {
     }
 
     /// Returns the session ID, if defined.
-    pub async fn get_session_id(&self) -> Result<String, SdkError> {
+    pub async fn get_session_id(&self) -> Result<String, MessagingError> {
         self.inner.get_session_id().await
     }
 
     /// Sends a plain text message to the session.
-    pub async fn send_text_message(&self, message: &PlainText) -> Result<(), SdkError> {
+    pub async fn send_text_message(&self, message: &PlainText) -> Result<(), MessagingError> {
         self.inner.send_text_message(message).await
     }
 
     /// Sends a nudge to the session.
-    pub async fn send_nudge(&self) -> Result<(), SdkError> {
+    pub async fn send_nudge(&self) -> Result<(), MessagingError> {
         self.inner.send_nudge().await
     }
 
     /// Sends an "is writing..." notification to the session.
-    pub async fn send_typing_user(&self, email: &str) -> Result<(), SdkError> {
+    pub async fn send_typing_user(&self, email: &str) -> Result<(), MessagingError> {
         self.inner.send_typing_user(email).await
     }
 
@@ -63,7 +65,7 @@ impl SwitchboardWrapper {
         &self,
         email: &str,
         msn_object: &str,
-    ) -> Result<(), SdkError> {
+    ) -> Result<(), P2pError> {
         self.inner
             .request_contact_display_picture(email, msn_object)
             .await

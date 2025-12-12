@@ -1,4 +1,5 @@
 use crate::enums::msnp_status::MsnpStatus;
+use crate::errors::contact_error::ContactError;
 use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
 use crate::{Event, MsnpList, PersonalMessage, Switchboard};
@@ -72,7 +73,7 @@ impl Client {
         &self,
         guid: &str,
         display_name: &str,
-    ) -> Result<(), SdkError> {
+    ) -> Result<(), ContactError> {
         self.inner
             .set_contact_display_name(guid, display_name)
             .await
@@ -84,48 +85,52 @@ impl Client {
         email: &str,
         display_name: &str,
         list: MsnpList,
-    ) -> Result<Event, SdkError> {
+    ) -> Result<Event, ContactError> {
         self.inner.add_contact(email, display_name, list).await
     }
 
     /// Removes a contact from a specified list (except the forward list, which requires calling
     /// [remove_contact_from_forward_list][Client::remove_contact_from_forward_list]).
-    pub async fn remove_contact(&self, email: &str, list: MsnpList) -> Result<(), SdkError> {
+    pub async fn remove_contact(&self, email: &str, list: MsnpList) -> Result<(), ContactError> {
         self.inner.remove_contact(email, list).await
     }
 
     /// Removes a contact from the forward list.
-    pub async fn remove_contact_from_forward_list(&self, guid: &str) -> Result<(), SdkError> {
+    pub async fn remove_contact_from_forward_list(&self, guid: &str) -> Result<(), ContactError> {
         self.inner.remove_contact_from_forward_list(guid).await
     }
 
     /// Blocks a contact.
-    pub async fn block_contact(&self, email: &str) -> Result<(), SdkError> {
+    pub async fn block_contact(&self, email: &str) -> Result<(), ContactError> {
         self.inner.block_contact(email).await
     }
 
     /// Unblocks a contact.
-    pub async fn unblock_contact(&self, email: &str) -> Result<(), SdkError> {
+    pub async fn unblock_contact(&self, email: &str) -> Result<(), ContactError> {
         self.inner.unblock_contact(email).await
     }
 
     /// Creates a new contact group.
-    pub async fn create_group(&self, name: &str) -> Result<(), SdkError> {
+    pub async fn create_group(&self, name: &str) -> Result<(), ContactError> {
         self.inner.create_group(name).await
     }
 
     /// Deletes a contact group.
-    pub async fn delete_group(&self, guid: &str) -> Result<(), SdkError> {
+    pub async fn delete_group(&self, guid: &str) -> Result<(), ContactError> {
         self.inner.delete_group(guid).await
     }
 
     /// Renames a contact group.
-    pub async fn rename_group(&self, guid: &str, new_name: &str) -> Result<(), SdkError> {
+    pub async fn rename_group(&self, guid: &str, new_name: &str) -> Result<(), ContactError> {
         self.inner.rename_group(guid, new_name).await
     }
 
     /// Adds a contact to a group.
-    pub async fn add_contact_to_group(&self, guid: &str, group_guid: &str) -> Result<(), SdkError> {
+    pub async fn add_contact_to_group(
+        &self,
+        guid: &str,
+        group_guid: &str,
+    ) -> Result<(), ContactError> {
         self.inner.add_contact_to_group(guid, group_guid).await
     }
 
@@ -134,7 +139,7 @@ impl Client {
         &self,
         guid: &str,
         group_guid: &str,
-    ) -> Result<(), SdkError> {
+    ) -> Result<(), ContactError> {
         self.inner.remove_contact_from_group(guid, group_guid).await
     }
 

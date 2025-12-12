@@ -1,5 +1,5 @@
 use crate::enums::internal_event::InternalEvent;
-use crate::errors::sdk_error::SdkError;
+use crate::errors::contact_error::ContactError;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::{broadcast, mpsc};
@@ -9,7 +9,7 @@ pub async fn send(
     ns_tx: &mpsc::Sender<Vec<u8>>,
     internal_rx: &mut broadcast::Receiver<InternalEvent>,
     name: &str,
-) -> Result<(), SdkError> {
+) -> Result<(), ContactError> {
     tr_id.fetch_add(1, Ordering::SeqCst);
     let tr_id = tr_id.load(Ordering::SeqCst);
 
@@ -18,13 +18,15 @@ pub async fn send(
     ns_tx
         .send(command.as_bytes().to_vec())
         .await
-        .or(Err(SdkError::TransmittingError))?;
+        .or(Err(ContactError::TransmittingError))?;
 
     trace!("C: {command}");
 
     loop {
-        if let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        if let InternalEvent::ServerReply(reply) = internal_rx
+            .recv()
+            .await
+            .or(Err(ContactError::ReceivingError))?
         {
             trace!("S: {reply}");
 
@@ -40,13 +42,13 @@ pub async fn send(
 
                 "228" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::InvalidArgument);
+                        return Err(ContactError::InvalidArgument);
                     }
                 }
 
                 "603" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::ServerError);
+                        return Err(ContactError::ServerError);
                     }
                 }
 

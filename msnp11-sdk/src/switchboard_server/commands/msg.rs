@@ -1,5 +1,6 @@
 use crate::enums::internal_event::InternalEvent;
-use crate::errors::sdk_error::SdkError;
+use crate::errors::messaging_error::MessagingError;
+use crate::errors::p2p_error::P2pError;
 use crate::models::plain_text::PlainText;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -10,7 +11,7 @@ pub async fn send_text_message(
     sb_tx: &mpsc::Sender<Vec<u8>>,
     internal_rx: &mut broadcast::Receiver<InternalEvent>,
     message: &PlainText,
-) -> Result<(), SdkError> {
+) -> Result<(), MessagingError> {
     let payload = message.payload();
 
     tr_id.fetch_add(1, Ordering::SeqCst);
@@ -20,13 +21,15 @@ pub async fn send_text_message(
     sb_tx
         .send(command.as_bytes().to_vec())
         .await
-        .or(Err(SdkError::TransmittingError))?;
+        .or(Err(MessagingError::TransmittingError))?;
 
     trace!("C: {command}");
 
     loop {
-        if let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        if let InternalEvent::ServerReply(reply) = internal_rx
+            .recv()
+            .await
+            .or(Err(MessagingError::ReceivingError))?
         {
             trace!("S: {reply}");
 
@@ -40,13 +43,13 @@ pub async fn send_text_message(
 
                 "NAK" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::MessageNotDelivered);
+                        return Err(MessagingError::MessageNotDelivered);
                     }
                 }
 
                 "282" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::MessageNotDelivered);
+                        return Err(MessagingError::MessageNotDelivered);
                     }
                 }
 
@@ -60,7 +63,7 @@ pub async fn send_nudge(
     tr_id: &AtomicU32,
     sb_tx: &mpsc::Sender<Vec<u8>>,
     internal_rx: &mut broadcast::Receiver<InternalEvent>,
-) -> Result<(), SdkError> {
+) -> Result<(), MessagingError> {
     let mut payload = String::from("MIME-Version: 1.0\r\n");
     payload.push_str("Content-Type: text/x-msnmsgr-datacast\r\n\r\n");
     payload.push_str("ID: 1\r\n\r\n");
@@ -72,13 +75,15 @@ pub async fn send_nudge(
     sb_tx
         .send(command.as_bytes().to_vec())
         .await
-        .or(Err(SdkError::TransmittingError))?;
+        .or(Err(MessagingError::TransmittingError))?;
 
     trace!("C: {command}");
 
     loop {
-        if let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        if let InternalEvent::ServerReply(reply) = internal_rx
+            .recv()
+            .await
+            .or(Err(MessagingError::ReceivingError))?
         {
             trace!("S: {reply}");
 
@@ -92,13 +97,13 @@ pub async fn send_nudge(
 
                 "NAK" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::MessageNotDelivered);
+                        return Err(MessagingError::MessageNotDelivered);
                     }
                 }
 
                 "282" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::MessageNotDelivered);
+                        return Err(MessagingError::MessageNotDelivered);
                     }
                 }
 
@@ -112,7 +117,7 @@ pub async fn send_typing_user(
     tr_id: &AtomicU32,
     sb_tx: &mpsc::Sender<Vec<u8>>,
     email: &str,
-) -> Result<(), SdkError> {
+) -> Result<(), MessagingError> {
     let mut payload = String::from("MIME-Version: 1.0\r\n");
     payload.push_str("Content-Type: text/x-msmsgscontrol\r\n");
     payload.push_str(format!("TypingUser: {email}\r\n\r\n\r\n").as_str());
@@ -124,7 +129,7 @@ pub async fn send_typing_user(
     sb_tx
         .send(command.as_bytes().to_vec())
         .await
-        .or(Err(SdkError::TransmittingError))?;
+        .or(Err(MessagingError::TransmittingError))?;
 
     trace!("C: {command}");
 
@@ -137,7 +142,7 @@ pub async fn send_p2p(
     internal_rx: &mut broadcast::Receiver<InternalEvent>,
     message: Vec<u8>,
     destination: &str,
-) -> Result<(), SdkError> {
+) -> Result<(), P2pError> {
     let mut payload = String::from("MIME-Version: 1.0\r\n");
     payload.push_str("Content-Type: application/x-msnmsgrp2p\r\n");
     payload.push_str(format!("P2P-Dest: {destination}\r\n\r\n").as_str());
@@ -155,13 +160,13 @@ pub async fn send_p2p(
     sb_tx
         .send(command)
         .await
-        .or(Err(SdkError::TransmittingError))?;
+        .or(Err(P2pError::TransmittingError))?;
 
     trace!("C: {command_string}");
 
     loop {
         if let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+            internal_rx.recv().await.or(Err(P2pError::ReceivingError))?
         {
             trace!("S: {reply}");
 
@@ -175,13 +180,13 @@ pub async fn send_p2p(
 
                 "NAK" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::MessageNotDelivered);
+                        return Err(P2pError::MessageNotDelivered);
                     }
                 }
 
                 "282" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::MessageNotDelivered);
+                        return Err(P2pError::MessageNotDelivered);
                     }
                 }
 

@@ -1,5 +1,4 @@
 use crate::errors::p2p_error::P2pError;
-use crate::errors::sdk_error::SdkError;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
@@ -59,7 +58,7 @@ impl DisplayPictureSession {
         })
     }
 
-    pub fn invite(&mut self, to: &str, from: &str, msn_object: &str) -> Result<Vec<u8>, SdkError> {
+    pub fn invite(&mut self, to: &str, from: &str, msn_object: &str) -> Result<Vec<u8>, P2pError> {
         let branch = guid_create::GUID::rand().to_string();
         let call_id = guid_create::GUID::rand().to_string();
         let session_id = rng().next_u32();
@@ -98,7 +97,7 @@ impl DisplayPictureSession {
             ack_data_size: 0,
         }
         .to_bytes()
-        .or(Err(SdkError::BinaryHeaderReadingError))?;
+        .or(Err(P2pError::BinaryHeaderReadingError))?;
 
         self.branch = branch;
         self.call_id = call_id;
@@ -108,14 +107,14 @@ impl DisplayPictureSession {
         Ok(invite)
     }
 
-    pub fn acknowledge(payload: &[u8]) -> Result<Vec<u8>, SdkError> {
+    pub fn acknowledge(payload: &[u8]) -> Result<Vec<u8>, P2pError> {
         let binary_header = payload
             .get(..48)
-            .ok_or(SdkError::BinaryHeaderReadingError)?;
+            .ok_or(P2pError::BinaryHeaderReadingError)?;
 
         let mut cursor = Cursor::new(binary_header);
         let (_, binary_header) = BinaryHeader::from_reader((&mut cursor, 0))
-            .or(Err(SdkError::BinaryHeaderReadingError))?;
+            .or(Err(P2pError::BinaryHeaderReadingError))?;
 
         let mut ack_header = BinaryHeader {
             session_id: binary_header.session_id,
@@ -129,7 +128,7 @@ impl DisplayPictureSession {
             ack_data_size: binary_header.ack_data_size,
         }
         .to_bytes()
-        .or(Err(SdkError::BinaryHeaderReadingError))?;
+        .or(Err(P2pError::BinaryHeaderReadingError))?;
 
         ack_header.extend_from_slice(&[0; 4]);
         Ok(ack_header)
@@ -250,7 +249,7 @@ impl DisplayPictureSession {
         Ok(payloads)
     }
 
-    pub fn bye(&self, to: &str, from: &str) -> Result<Vec<u8>, SdkError> {
+    pub fn bye(&self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
         let body = "\r\n\0";
 
         let mut headers = format!("BYE MSNMSGR:{to} MSNSLP/1.0\r\n");
@@ -276,7 +275,7 @@ impl DisplayPictureSession {
             ack_data_size: 0,
         }
         .to_bytes()
-        .or(Err(SdkError::BinaryHeaderReadingError))?;
+        .or(Err(P2pError::BinaryHeaderReadingError))?;
 
         bye.extend_from_slice(message.as_bytes());
         bye.extend_from_slice(&[0; 4]);

@@ -1,29 +1,28 @@
-use std::fmt;
-
-#[derive(Debug)]
+/// Errors when using P2P features like display picture transfers.
+#[derive(Debug, uniffi::Error, thiserror::Error)]
 pub enum P2pError {
-    /// P2P session kind not supported.
+    #[error("P2P session kind not supported")]
     P2pInvite,
-
-    /// Invite is for a different user.
+    #[error("Invite is for a different user")]
     OtherDestination,
-
-    /// Could not get session data.
+    #[error("Could get session data")]
     CouldNotGetSessionData,
-
-    /// Invite has an invalid context
+    #[error("Invite has an invalid context")]
     OtherContext,
+    #[error("Could not read binary header from P2P message")]
+    BinaryHeaderReadingError,
+    #[error("Message could not be delivered to all recipients")]
+    MessageNotDelivered,
+    #[error("Please log in before using this command")]
+    NotLoggedIn,
+    #[error("Error transmitting data")]
+    TransmittingError,
+    #[error("Error receiving data")]
+    ReceivingError,
+    #[error("P2P session kind not supported")]
+    InviteError,
+    #[error("Could not retrieve user data")]
+    CouldNotGetUserData,
+    #[error("Could not get contact display picture")]
+    CouldNotGetDisplayPicture,
 }
-
-impl fmt::Display for P2pError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            P2pError::P2pInvite => write!(f, "P2P session kind not supported"),
-            P2pError::OtherDestination => write!(f, "Invite is for a different user"),
-            P2pError::CouldNotGetSessionData => write!(f, "Could get session data"),
-            P2pError::OtherContext => write!(f, "Invite has an invalid context"),
-        }
-    }
-}
-
-impl std::error::Error for P2pError {}

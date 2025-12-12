@@ -1,5 +1,7 @@
 use crate::enums::event::Event;
 use crate::enums::internal_event::InternalEvent;
+use crate::errors::messaging_error::MessagingError;
+use crate::errors::p2p_error::P2pError;
 use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
 use crate::models::plain_text::PlainText;
@@ -106,7 +108,7 @@ impl Switchboard {
         })
     }
 
-    async fn handle_p2p_events(&self) -> Result<(), SdkError> {
+    fn handle_p2p_events(&self) {
         let sb_tx = self.sb_tx.clone();
         let mut internal_rx = self.internal_tx.subscribe();
         let mut command_internal_rx = self.internal_tx.subscribe();
@@ -151,8 +153,6 @@ impl Switchboard {
                 }
             }
         });
-
-        Ok(())
     }
 
     pub(crate) async fn login(&self, email: &str) -> Result<(), SdkError> {
@@ -166,7 +166,8 @@ impl Switchboard {
         )
         .await?;
 
-        self.handle_p2p_events().await
+        self.handle_p2p_events();
+        Ok(())
     }
 
     pub(crate) async fn answer(
@@ -185,7 +186,7 @@ impl Switchboard {
         )
         .await?;
 
-        self.handle_p2p_events().await?;
+        self.handle_p2p_events();
         let mut session_id_lock = self.session_id.write().await;
         *session_id_lock = Some(session_id.to_owned());
 
@@ -232,25 +233,27 @@ impl Switchboard {
     }
 
     /// Returns the session ID, if defined.
-    pub async fn get_session_id(&self) -> Result<String, SdkError> {
+    pub async fn get_session_id(&self) -> Result<String, MessagingError> {
         let session_id = self.session_id.read().await;
-        session_id.clone().ok_or(SdkError::CouldNotGetSessionId)
+        session_id
+            .clone()
+            .ok_or(MessagingError::CouldNotGetSessionId)
     }
 
     /// Sends a plain text message to the session.
-    pub async fn send_text_message(&self, message: &PlainText) -> Result<(), SdkError> {
+    pub async fn send_text_message(&self, message: &PlainText) -> Result<(), MessagingError> {
         let mut internal_rx = self.internal_tx.subscribe();
         msg::send_text_message(&self.tr_id, &self.sb_tx, &mut internal_rx, message).await
     }
 
     /// Sends a nudge to the session.
-    pub async fn send_nudge(&self) -> Result<(), SdkError> {
+    pub async fn send_nudge(&self) -> Result<(), MessagingError> {
         let mut internal_rx = self.internal_tx.subscribe();
         msg::send_nudge(&self.tr_id, &self.sb_tx, &mut internal_rx).await
     }
 
     /// Sends an "is writing..." notification to the session.
-    pub async fn send_typing_user(&self, email: &str) -> Result<(), SdkError> {
+    pub async fn send_typing_user(&self, email: &str) -> Result<(), MessagingError> {
         msg::send_typing_user(&self.tr_id, &self.sb_tx, email).await
     }
 
@@ -260,14 +263,14 @@ impl Switchboard {
         &self,
         email: &str,
         msn_object: &str,
-    ) -> Result<(), SdkError> {
+    ) -> Result<(), P2pError> {
         let mut internal_rx = self.internal_tx.subscribe();
         let mut session = DisplayPictureSession::new();
 
         let invite;
         {
             let user_data = self.user_data.read().await;
-            let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+            let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
             invite = session.invite(email, user_email, msn_object)?
         }
 
@@ -278,14 +281,14 @@ impl Switchboard {
 
         let mut picture = Vec::new();
         loop {
-            match internal_rx.recv().await.or(Err(SdkError::ReceivingError))? {
+            match internal_rx.recv().await.or(Err(P2pError::ReceivingError))? {
                 InternalEvent::P2PShouldAck {
                     destination,
                     message,
                 } => {
                     {
                         let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
 
                         if destination != *user_email {
                             continue;
@@ -303,7 +306,7 @@ impl Switchboard {
                 } => {
                     {
                         let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
 
                         if destination != *user_email {
                             continue;
@@ -315,11 +318,11 @@ impl Switchboard {
                     let mut invite_parameters = invite_string.lines();
 
                     invite_parameters.next();
-                    let to = invite_parameters.next().ok_or(SdkError::P2PInviteError)?;
+                    let to = invite_parameters.next().ok_or(P2pError::InviteError)?;
 
                     {
                         let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
 
                         if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
                             continue;
@@ -328,16 +331,16 @@ impl Switchboard {
 
                     let from = invite_parameters
                         .next()
-                        .ok_or(SdkError::P2PInviteError)?
+                        .ok_or(P2pError::InviteError)?
                         .replace("From: <msnmsgr:", "")
                         .replace(">", "");
 
                     let session = DisplayPictureSession::new_from_invite(&invite)
-                        .or(Err(SdkError::P2PInviteError))?;
+                        .or(Err(P2pError::InviteError))?;
 
                     let decline = session
                         .decline(from.as_str(), to)
-                        .or(Err(SdkError::P2PInviteError))?;
+                        .or(Err(P2pError::InviteError))?;
 
                     msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, decline, email)
                         .await?;
@@ -349,20 +352,20 @@ impl Switchboard {
                 } => {
                     {
                         let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
 
                         if destination != *user_email {
                             continue;
                         }
                     }
 
-                    let binary_header = data.get(..48).ok_or(SdkError::BinaryHeaderReadingError)?;
+                    let binary_header = data.get(..48).ok_or(P2pError::BinaryHeaderReadingError)?;
                     let mut cursor = Cursor::new(binary_header);
                     let (_, binary_header) = BinaryHeader::from_reader((&mut cursor, 0))
-                        .or(Err(SdkError::BinaryHeaderReadingError))?;
+                        .or(Err(P2pError::BinaryHeaderReadingError))?;
 
                     picture.extend_from_slice(
-                        data.get(48..).ok_or(SdkError::BinaryHeaderReadingError)?,
+                        data.get(48..).ok_or(P2pError::BinaryHeaderReadingError)?,
                     );
 
                     let data_len = picture.len();
@@ -387,7 +390,7 @@ impl Switchboard {
         let bye;
         {
             let user_data = self.user_data.read().await;
-            let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+            let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
             bye = session.bye(email, user_email)?;
         }
 
@@ -398,7 +401,7 @@ impl Switchboard {
                 data: picture,
             })
             .await
-            .or(Err(SdkError::TransmittingError))?;
+            .or(Err(P2pError::TransmittingError))?;
 
         Ok(())
     }

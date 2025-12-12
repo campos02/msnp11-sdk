@@ -1,5 +1,5 @@
+use crate::SdkError;
 use crate::enums::internal_event::InternalEvent;
-use crate::errors::sdk_error::SdkError;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::{broadcast, mpsc};

@@ -1,6 +1,5 @@
 use crate::enums::internal_event::InternalEvent;
 use crate::errors::p2p_error::P2pError;
-use crate::errors::sdk_error::SdkError;
 use crate::models::user_data::UserData;
 use crate::switchboard_server::commands::msg;
 use crate::switchboard_server::p2p::display_picture_session::DisplayPictureSession;
@@ -22,7 +21,7 @@ pub async fn handle_invite(
 ) -> Result<(), Box<dyn std::error::Error>> {
     {
         let user_data = user_data.read().await;
-        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
 
         if destination != *user_email {
             return Err(P2pError::OtherDestination.into());
@@ -39,7 +38,7 @@ pub async fn handle_invite(
 
     {
         let user_data = user_data.read().await;
-        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
 
         if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
             return Err(P2pError::OtherDestination.into());
@@ -74,7 +73,7 @@ pub async fn handle_invite(
         let msn_object = user_data
             .msn_object
             .as_ref()
-            .ok_or(SdkError::CouldNotGetUserData)?;
+            .ok_or(P2pError::CouldNotGetUserData)?;
 
         if context != STANDARD.encode((msn_object.to_owned() + "\0").as_bytes()) {
             return Err(P2pError::OtherContext.into());
@@ -105,7 +104,7 @@ pub async fn handle_invite(
     let display_picture = user_data
         .display_picture
         .as_ref()
-        .ok_or(SdkError::CouldNotGetDisplayPicture)?;
+        .ok_or(P2pError::CouldNotGetDisplayPicture)?;
 
     let data_payloads = session.data(display_picture)?;
     for data_payload in data_payloads {
@@ -132,7 +131,7 @@ pub async fn handle_bye(
 ) -> Result<(), Box<dyn std::error::Error>> {
     {
         let user_data = user_data.read().await;
-        let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
+        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
 
         if destination != *user_email {
             return Err(P2pError::OtherDestination.into());

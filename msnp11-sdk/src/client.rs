@@ -2,6 +2,7 @@ use crate::enums::event::Event;
 use crate::enums::internal_event::InternalEvent;
 use crate::enums::msnp_list::MsnpList;
 use crate::enums::msnp_status::MsnpStatus;
+use crate::errors::contact_error::ContactError;
 use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
 use crate::models::personal_message::PersonalMessage;
@@ -152,7 +153,7 @@ impl Client {
         });
     }
 
-    async fn handle_switchboard_invitations(&self) -> Result<(), SdkError> {
+    fn handle_switchboard_invitations(&self) {
         let event_tx = self.event_tx.clone();
         let mut internal_rx = self.internal_tx.subscribe();
 
@@ -188,8 +189,6 @@ impl Client {
                 }
             }
         });
-
-        Ok(())
     }
 
     /// Adds a handler closure. If you're using this SDK with Rust, not through a foreign language binding, then this is the preferred
@@ -272,7 +271,7 @@ impl Client {
         syn::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
         gcf::send(&self.tr_id, &self.ns_tx, &mut internal_rx).await?;
 
-        self.handle_switchboard_invitations().await?;
+        self.handle_switchboard_invitations();
         self.start_pinging();
         Ok(Event::Authenticated)
     }
@@ -313,7 +312,7 @@ impl Client {
         &self,
         guid: &str,
         display_name: &str,
-    ) -> Result<(), SdkError> {
+    ) -> Result<(), ContactError> {
         let mut internal_rx = self.internal_tx.subscribe();
         sbp::send(
             &self.tr_id,
@@ -331,7 +330,7 @@ impl Client {
         email: &str,
         display_name: &str,
         list: MsnpList,
-    ) -> Result<Event, SdkError> {
+    ) -> Result<Event, ContactError> {
         let mut internal_rx = self.internal_tx.subscribe();
         adc::send(
             &self.tr_id,
@@ -346,19 +345,19 @@ impl Client {
 
     /// Removes a contact from a specified list (except the forward list, which requires calling
     /// [remove_contact_from_forward_list][Client::remove_contact_from_forward_list]).
-    pub async fn remove_contact(&self, email: &str, list: MsnpList) -> Result<(), SdkError> {
+    pub async fn remove_contact(&self, email: &str, list: MsnpList) -> Result<(), ContactError> {
         let mut internal_rx = self.internal_tx.subscribe();
         rem::send(&self.tr_id, &self.ns_tx, &mut internal_rx, email, list).await
     }
 
     /// Removes a contact from the forward list.
-    pub async fn remove_contact_from_forward_list(&self, guid: &str) -> Result<(), SdkError> {
+    pub async fn remove_contact_from_forward_list(&self, guid: &str) -> Result<(), ContactError> {
         let mut internal_rx = self.internal_tx.subscribe();
         rem::send_with_forward_list(&self.tr_id, &self.ns_tx, &mut internal_rx, guid).await
     }
 
     /// Blocks a contact.
-    pub async fn block_contact(&self, email: &str) -> Result<(), SdkError> {
+    pub async fn block_contact(&self, email: &str) -> Result<(), ContactError> {
         let mut internal_rx = self.internal_tx.subscribe();
         adc::send(
             &self.tr_id,
@@ -381,7 +380,7 @@ impl Client {
     }
 
     /// Unblocks a contact.
-    pub async fn unblock_contact(&self, email: &str) -> Result<(), SdkError> {
+    pub async fn unblock_contact(&self, email: &str) -> Result<(), ContactError> {
         let mut internal_rx = self.internal_tx.subscribe();
         adc::send(
             &self.tr_id,
@@ -404,25 +403,29 @@ impl Client {
     }
 
     /// Creates a new contact group.
-    pub async fn create_group(&self, name: &str) -> Result<(), SdkError> {
+    pub async fn create_group(&self, name: &str) -> Result<(), ContactError> {
         let mut internal_rx = self.internal_tx.subscribe();
         adg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, name).await
     }
 
     /// Deletes a contact group.
-    pub async fn delete_group(&self, guid: &str) -> Result<(), SdkError> {
+    pub async fn delete_group(&self, guid: &str) -> Result<(), ContactError> {
         let mut internal_rx = self.internal_tx.subscribe();
         rmg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, guid).await
     }
 
     /// Renames a contact group.
-    pub async fn rename_group(&self, guid: &str, new_name: &str) -> Result<(), SdkError> {
+    pub async fn rename_group(&self, guid: &str, new_name: &str) -> Result<(), ContactError> {
         let mut internal_rx = self.internal_tx.subscribe();
         reg::send(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, new_name).await
     }
 
     /// Adds a contact to a group.
-    pub async fn add_contact_to_group(&self, guid: &str, group_guid: &str) -> Result<(), SdkError> {
+    pub async fn add_contact_to_group(
+        &self,
+        guid: &str,
+        group_guid: &str,
+    ) -> Result<(), ContactError> {
         let mut internal_rx = self.internal_tx.subscribe();
         adc::send_with_group(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, group_guid).await
     }
@@ -432,7 +435,7 @@ impl Client {
         &self,
         guid: &str,
         group_guid: &str,
-    ) -> Result<(), SdkError> {
+    ) -> Result<(), ContactError> {
         let mut internal_rx = self.internal_tx.subscribe();
         rem::send_with_group(&self.tr_id, &self.ns_tx, &mut internal_rx, guid, group_guid).await
     }

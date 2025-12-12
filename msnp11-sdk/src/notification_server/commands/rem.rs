@@ -1,6 +1,6 @@
 use crate::enums::internal_event::InternalEvent;
 use crate::enums::msnp_list::MsnpList;
-use crate::errors::sdk_error::SdkError;
+use crate::errors::contact_error::ContactError;
 use log::trace;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::{broadcast, mpsc};
@@ -11,12 +11,12 @@ pub async fn send(
     internal_rx: &mut broadcast::Receiver<InternalEvent>,
     email: &str,
     list: MsnpList,
-) -> Result<(), SdkError> {
+) -> Result<(), ContactError> {
     tr_id.fetch_add(1, Ordering::SeqCst);
     let tr_id = tr_id.load(Ordering::SeqCst);
 
     let list = match list {
-        MsnpList::ForwardList => return Err(SdkError::InvalidArgument),
+        MsnpList::ForwardList => return Err(ContactError::InvalidArgument),
         MsnpList::AllowList => "AL",
         MsnpList::BlockList => "BL",
         MsnpList::ReverseList => "RL",
@@ -27,13 +27,15 @@ pub async fn send(
     ns_tx
         .send(command.as_bytes().to_vec())
         .await
-        .or(Err(SdkError::TransmittingError))?;
+        .or(Err(ContactError::TransmittingError))?;
 
     trace!("C: {command}");
 
     loop {
-        if let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        if let InternalEvent::ServerReply(reply) = internal_rx
+            .recv()
+            .await
+            .or(Err(ContactError::ReceivingError))?
         {
             trace!("S: {reply}");
 
@@ -50,19 +52,19 @@ pub async fn send(
 
                 "201" | "216" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::InvalidArgument);
+                        return Err(ContactError::InvalidArgument);
                     }
                 }
 
                 "208" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::InvalidContact);
+                        return Err(ContactError::InvalidContact);
                     }
                 }
 
                 "603" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::ServerError);
+                        return Err(ContactError::ServerError);
                     }
                 }
 
@@ -77,7 +79,7 @@ pub async fn send_with_forward_list(
     ns_tx: &mpsc::Sender<Vec<u8>>,
     internal_rx: &mut broadcast::Receiver<InternalEvent>,
     guid: &str,
-) -> Result<(), SdkError> {
+) -> Result<(), ContactError> {
     tr_id.fetch_add(1, Ordering::SeqCst);
     let tr_id = tr_id.load(Ordering::SeqCst);
 
@@ -85,13 +87,15 @@ pub async fn send_with_forward_list(
     ns_tx
         .send(command.as_bytes().to_vec())
         .await
-        .or(Err(SdkError::TransmittingError))?;
+        .or(Err(ContactError::TransmittingError))?;
 
     trace!("C: {command}");
 
     loop {
-        if let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        if let InternalEvent::ServerReply(reply) = internal_rx
+            .recv()
+            .await
+            .or(Err(ContactError::ReceivingError))?
         {
             trace!("S: {reply}");
 
@@ -108,19 +112,19 @@ pub async fn send_with_forward_list(
 
                 "201" | "216" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::InvalidArgument);
+                        return Err(ContactError::InvalidArgument);
                     }
                 }
 
                 "208" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::InvalidContact);
+                        return Err(ContactError::InvalidContact);
                     }
                 }
 
                 "603" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::ServerError);
+                        return Err(ContactError::ServerError);
                     }
                 }
 
@@ -136,7 +140,7 @@ pub async fn send_with_group(
     internal_rx: &mut broadcast::Receiver<InternalEvent>,
     guid: &str,
     group_guid: &str,
-) -> Result<(), SdkError> {
+) -> Result<(), ContactError> {
     tr_id.fetch_add(1, Ordering::SeqCst);
     let tr_id = tr_id.load(Ordering::SeqCst);
 
@@ -144,13 +148,15 @@ pub async fn send_with_group(
     ns_tx
         .send(command.as_bytes().to_vec())
         .await
-        .or(Err(SdkError::TransmittingError))?;
+        .or(Err(ContactError::TransmittingError))?;
 
     trace!("C: {command}");
 
     loop {
-        if let InternalEvent::ServerReply(reply) =
-            internal_rx.recv().await.or(Err(SdkError::ReceivingError))?
+        if let InternalEvent::ServerReply(reply) = internal_rx
+            .recv()
+            .await
+            .or(Err(ContactError::ReceivingError))?
         {
             trace!("S: {reply}");
 
@@ -168,19 +174,19 @@ pub async fn send_with_group(
 
                 "201" | "216" | "224" | "225" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::InvalidArgument);
+                        return Err(ContactError::InvalidArgument);
                     }
                 }
 
                 "208" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::InvalidContact);
+                        return Err(ContactError::InvalidContact);
                     }
                 }
 
                 "603" => {
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::ServerError);
+                        return Err(ContactError::ServerError);
                     }
                 }
 
