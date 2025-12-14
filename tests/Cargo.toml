@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-msnp11-sdk = { path = "../msnp11-sdk" }
+msnp11-sdk = { path = "../msnp11-sdk", features = ["tabs"] }
 tokio = "1.48.0"

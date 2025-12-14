@@ -55,9 +55,9 @@ pub mod enums;
 mod errors;
 pub mod event_handler;
 mod exports;
+mod http;
 pub mod models;
 mod notification_server;
-mod passport_auth;
 mod receive_split;
 pub mod switchboard_server;
 
@@ -76,3 +76,6 @@ pub use models::personal_message::PersonalMessage;
 pub use models::plain_text::PlainText;
 pub use models::presence::Presence;
 pub use switchboard_server::switchboard::Switchboard;
+
+#[cfg(feature = "tabs")]
+pub use http::xml::tab::Tab;

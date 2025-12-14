@@ -33,4 +33,6 @@ pub enum SdkError {
     InvalidContact,
     #[error("The contact you're trying to invite is offline")]
     ContactIsOffline,
+    #[error("Error requesting tabs")]
+    TabRequestError,
 }

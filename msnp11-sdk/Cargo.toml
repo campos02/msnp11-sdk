@@ -27,6 +27,9 @@ thiserror = "2.0.17"
 [build-dependencies]
 uniffi = { version = "0.30.0", features = [ "build" ] }
 
+[features]
+tabs = []
+
 [lib]
 crate-type = ["cdylib", "staticlib", "lib"]
 name = "msnp11_sdk"

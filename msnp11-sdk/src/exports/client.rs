@@ -2,7 +2,7 @@ use crate::enums::msnp_status::MsnpStatus;
 use crate::errors::contact_error::ContactError;
 use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
-use crate::{Event, MsnpList, PersonalMessage, Switchboard};
+use crate::{Event, MsnpList, PersonalMessage, Switchboard, Tab};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -48,6 +48,13 @@ impl Client {
                 .login(email, password, nexus_url, client_name, version)
                 .await
         })
+    }
+
+    #[cfg(feature = "tabs")]
+    /// Makes a request to get the tabs and returns them.
+    pub async fn get_tabs(&self, config_url: &str) -> Result<Vec<Tab>, SdkError> {
+        self.rt
+            .block_on(async { self.inner.get_tabs(config_url).await })
     }
 
     /// Sets the user's presence status.

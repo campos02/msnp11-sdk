@@ -1,3 +1,5 @@
+#[cfg(feature = "tabs")]
+use crate::Tab;
 use crate::enums::event::Event;
 use crate::enums::internal_event::InternalEvent;
 use crate::enums::msnp_list::MsnpList;
@@ -5,6 +7,7 @@ use crate::enums::msnp_status::MsnpStatus;
 use crate::errors::contact_error::ContactError;
 use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
+use crate::http::http_client::HttpClient;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
 use crate::models::user_data::UserData;
@@ -12,7 +15,6 @@ use crate::notification_server::commands::{
     adc, adg, blp, chg, cvr, gcf, gtc, prp, reg, rem, rmg, sbp, syn, usr_i, usr_s, uux, ver, xfr,
 };
 use crate::notification_server::event_matcher::{into_event, into_internal_event};
-use crate::passport_auth::PassportAuth;
 use crate::receive_split::receive_split;
 use crate::switchboard_server::switchboard::Switchboard;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -33,6 +35,7 @@ pub struct Client {
     internal_tx: broadcast::Sender<InternalEvent>,
     tr_id: AtomicU32,
     user_data: Arc<RwLock<UserData>>,
+    http_client: HttpClient,
 }
 
 impl Client {
@@ -114,6 +117,7 @@ impl Client {
             internal_tx,
             tr_id: AtomicU32::new(0),
             user_data: Arc::new(RwLock::new(UserData::new())),
+            http_client: HttpClient::new(),
         })
     }
 
@@ -256,9 +260,9 @@ impl Client {
                 _ => return Err(SdkError::CouldNotGetAuthenticationString),
             };
 
-        let auth = PassportAuth::new(nexus_url);
-        let token = auth
-            .get_passport_token(&email, password, &authorization_string)
+        let token = self
+            .http_client
+            .get_passport_token(&email, password, nexus_url, &authorization_string)
             .await?;
 
         usr_s::send(&self.tr_id, &self.ns_tx, &mut internal_rx, &token).await?;
@@ -274,6 +278,15 @@ impl Client {
         self.handle_switchboard_invitations();
         self.start_pinging();
         Ok(Event::Authenticated)
+    }
+
+    #[cfg(feature = "tabs")]
+    /// Makes a request to get the tabs and returns them.
+    pub async fn get_tabs(&self, config_url: &str) -> Result<Vec<Tab>, SdkError> {
+        self.http_client
+            .get_tabs(config_url)
+            .await
+            .or(Err(SdkError::TabRequestError))
     }
 
     /// Sets the user's presence status.
