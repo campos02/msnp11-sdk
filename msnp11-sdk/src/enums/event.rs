@@ -92,8 +92,8 @@ pub enum Event {
     /// A contact's display picture was transferred.
     DisplayPicture { email: String, data: Vec<u8> },
 
-    /// The server has sent a maintenance warning.
-    ServerMaintenance { time_remaining: u32 },
+    /// The server has warned it will shut down for maintenance.
+    ServerMaintenanceScheduled { time_remaining: u32 },
 
     /// Disconnected because the user logged in on another device.
     LoggedInAnotherDevice,

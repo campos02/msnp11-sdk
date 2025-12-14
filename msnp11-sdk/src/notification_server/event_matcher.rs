@@ -261,7 +261,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
                     let (_, time_remaining) = time_remaining.split_once(":")?;
 
                     let time_remaining = time_remaining.trim().parse::<u32>().ok()?;
-                    return Some(Event::ServerMaintenance { time_remaining });
+                    return Some(Event::ServerMaintenanceScheduled { time_remaining });
                 }
             }
 

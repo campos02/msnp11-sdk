@@ -116,7 +116,7 @@ async fn login() {
                 );
             }
 
-            msnp11_sdk::enums::event::Event::ServerMaintenance { time_remaining } => {
+            msnp11_sdk::enums::event::Event::ServerMaintenanceScheduled { time_remaining } => {
                 assert_eq!(time_remaining, 5);
             }
 
