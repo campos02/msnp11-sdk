@@ -50,7 +50,6 @@ impl Client {
         })
     }
 
-    #[cfg(feature = "tabs")]
     /// Makes a request to get the tabs and returns them.
     pub async fn get_tabs(&self, config_url: &str) -> Result<Vec<Tab>, SdkError> {
         self.rt

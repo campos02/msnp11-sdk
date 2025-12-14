@@ -54,6 +54,7 @@ pub mod client;
 pub mod enums;
 mod errors;
 pub mod event_handler;
+#[cfg(feature = "uniffi")]
 mod exports;
 mod http;
 pub mod models;
