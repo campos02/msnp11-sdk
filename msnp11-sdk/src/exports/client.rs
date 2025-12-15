@@ -50,10 +50,10 @@ impl Client {
         })
     }
 
-    /// Makes a request to get the tabs and returns them.
-    pub async fn get_tabs(&self, config_url: &str) -> Result<Vec<Tab>, SdkError> {
+    /// Makes a request to get the config file (containing tabs and the MSN Today url) and returns it.
+    pub async fn get_config(&self, config_url: &str) -> Result<Vec<Tab>, SdkError> {
         self.rt
-            .block_on(async { self.inner.get_tabs(config_url).await })
+            .block_on(async { self.inner.get_config(config_url).await })
     }
 
     /// Sets the user's presence status.

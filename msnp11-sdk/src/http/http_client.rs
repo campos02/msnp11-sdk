@@ -1,12 +1,12 @@
-#[cfg(feature = "tabs")]
-use crate::Tab;
 use crate::errors::sdk_error::SdkError;
-#[cfg(feature = "tabs")]
+#[cfg(feature = "config")]
+use crate::http::config::Config;
+#[cfg(feature = "config")]
 use crate::http::xml::envelope::SoapEnvelope;
-#[cfg(feature = "tabs")]
+#[cfg(feature = "config")]
 use crate::http::xml::msgr_config::MsgrConfig;
 use reqwest::header::{AUTHORIZATION, HeaderMap};
-#[cfg(feature = "tabs")]
+#[cfg(feature = "config")]
 use reqwest::header::{CONTENT_TYPE, HeaderValue};
 use std::error::Error;
 
@@ -77,8 +77,8 @@ impl HttpClient {
         Ok(token.replace("'", ""))
     }
 
-    #[cfg(feature = "tabs")]
-    pub async fn get_tabs(&self, config_url: &str) -> Result<Vec<Tab>, Box<dyn Error>> {
+    #[cfg(feature = "config")]
+    pub async fn get_config(&self, config_url: &str) -> Result<Config, Box<dyn Error>> {
         let mut headers = HeaderMap::with_capacity(2);
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("text/xml"));
         headers.insert(
@@ -121,6 +121,9 @@ impl HttpClient {
                 .get_client_config_result,
         )?;
 
-        Ok(msgr_config.tab_config.msntabdata.tab)
+        Ok(Config {
+            tabs: msgr_config.tab_config.msn_tab_data.tab,
+            msn_today_url: msgr_config.localized_config.msn_today_config.msn_today_url,
+        })
     }
 }

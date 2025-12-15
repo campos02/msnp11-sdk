@@ -3,7 +3,7 @@ name = "msnp11-sdk"
 description = "An MSNP11 client SDK"
 repository = "https://github.com/campos02/msnp11-sdk"
 license = "MIT"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2024"
 readme = "../README.md"
 
@@ -28,8 +28,8 @@ thiserror = "2.0.17"
 uniffi = { version = "0.30.0", features = [ "build" ] }
 
 [features]
-tabs = []
-uniffi = ["tabs"]
+config = []
+uniffi = ["config"]
 
 [lib]
 crate-type = ["cdylib", "staticlib", "lib"]

@@ -18,6 +18,7 @@ async fn add_contact() {
             client = msnp11_sdk::client::Client::new(&*server, port)
                 .await
                 .unwrap();
+
             client
                 .login(
                     "testing@example.com".to_string(),

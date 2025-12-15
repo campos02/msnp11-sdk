@@ -1,5 +1,3 @@
-#[cfg(feature = "tabs")]
-use crate::Tab;
 use crate::enums::event::Event;
 use crate::enums::internal_event::InternalEvent;
 use crate::enums::msnp_list::MsnpList;
@@ -7,6 +5,8 @@ use crate::enums::msnp_status::MsnpStatus;
 use crate::errors::contact_error::ContactError;
 use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
+#[cfg(feature = "config")]
+use crate::http::config::Config;
 use crate::http::http_client::HttpClient;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::presence::Presence;
@@ -280,13 +280,13 @@ impl Client {
         Ok(Event::Authenticated)
     }
 
-    #[cfg(feature = "tabs")]
-    /// Makes a request to get the tabs and returns them.
-    pub async fn get_tabs(&self, config_url: &str) -> Result<Vec<Tab>, SdkError> {
+    #[cfg(feature = "config")]
+    /// Makes a request to get the config file (containing tabs and the MSN Today url) and returns it.
+    pub async fn get_config(&self, config_url: &str) -> Result<Config, SdkError> {
         self.http_client
-            .get_tabs(config_url)
+            .get_config(config_url)
             .await
-            .or(Err(SdkError::TabRequestError))
+            .or(Err(SdkError::ConfigRequestError))
     }
 
     /// Sets the user's presence status.

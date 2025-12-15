@@ -78,5 +78,7 @@ pub use models::plain_text::PlainText;
 pub use models::presence::Presence;
 pub use switchboard_server::switchboard::Switchboard;
 
-#[cfg(feature = "tabs")]
+#[cfg(feature = "config")]
+pub use http::config::Config;
+#[cfg(feature = "config")]
 pub use http::xml::tab::Tab;
