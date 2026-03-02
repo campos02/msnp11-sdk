@@ -26,6 +26,7 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpStream, lookup_host};
 use tokio::sync::{RwLock, broadcast, mpsc};
+use tokio_util::sync::CancellationToken;
 
 /// Defines the client itself, all Notification Server actions are done through an instance of this struct.
 pub struct Client {
@@ -36,6 +37,7 @@ pub struct Client {
     tr_id: AtomicU32,
     user_data: Arc<RwLock<UserData>>,
     http_client: HttpClient,
+    cancellation_token: CancellationToken,
 }
 
 impl Client {
@@ -59,14 +61,19 @@ impl Client {
             .or(Err(SdkError::ServerError))?;
 
         let (mut rd, mut wr) = socket.into_split();
-        let internal_task_tx = internal_tx.clone();
-        let event_task_tx = event_tx.clone();
+        let task_internal_tx = internal_tx.clone();
+        let task_event_tx = event_tx.clone();
+
+        let cancellation_token = CancellationToken::new();
+        let task_cancellation_token = cancellation_token.clone();
 
         tokio::spawn(async move {
-            'outer: while let Ok(messages) = receive_split(&mut rd).await {
+            'outer: while let Ok(messages) =
+                receive_split(&mut rd, task_cancellation_token.clone()).await
+            {
                 for message in messages {
                     let internal_event = into_internal_event(&message);
-                    if let Err(error) = internal_task_tx.send(internal_event) {
+                    if let Err(error) = task_internal_tx.send(internal_event) {
                         error!("{error}");
                     }
 
@@ -75,39 +82,55 @@ impl Client {
                         let disconnected =
                             matches!(event, Event::Disconnected | Event::LoggedInAnotherDevice);
 
-                        if let Err(error) = event_task_tx.send(event).await {
+                        if let Err(error) = task_event_tx.send(event).await {
                             error!("{error}");
                             break 'outer;
                         }
 
                         if disconnected {
-                            event_task_tx.close();
+                            task_event_tx.close();
                             break 'outer;
                         }
                     }
                 }
             }
 
-            if let Err(error) = event_task_tx.send(Event::Disconnected).await {
+            if let Err(error) = task_event_tx.send(Event::Disconnected).await {
                 error!("{error}");
             }
 
-            event_task_tx.close();
+            task_event_tx.close();
+            task_cancellation_token.cancel();
         });
 
-        let event_task_tx = event_tx.clone();
+        let task_event_tx = event_tx.clone();
+        let task_cancellation_token = cancellation_token.clone();
+
         tokio::spawn(async move {
-            while let Some(message) = ns_rx.recv().await {
-                if let Err(error) = wr.write_all(message.as_slice()).await {
-                    error!("{error}");
+            loop {
+                tokio::select! {
+                    message = ns_rx.recv() => {
+                        if let Some(message) = message {
+                            if let Err(error) = wr.write_all(&message).await {
+                                error!("{error}")
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+
+                    _ = task_cancellation_token.cancelled() => {
+                        break;
+                    }
                 }
             }
 
-            if let Err(error) = event_task_tx.send(Event::Disconnected).await {
+            if let Err(error) = task_event_tx.send(Event::Disconnected).await {
                 error!("{error}");
             }
 
-            event_task_tx.close();
+            task_event_tx.close();
+            task_cancellation_token.cancel();
         });
 
         Ok(Self {
@@ -118,6 +141,7 @@ impl Client {
             tr_id: AtomicU32::new(0),
             user_data: Arc::new(RwLock::new(UserData::new())),
             http_client: HttpClient::new(),
+            cancellation_token,
         })
     }
 
@@ -125,24 +149,36 @@ impl Client {
         let event_tx = self.event_tx.clone();
         let ns_tx = self.ns_tx.clone();
         let mut internal_rx = self.internal_tx.subscribe();
+        let task_cancellation_token = self.cancellation_token.clone();
 
         tokio::spawn(async move {
             let command = "PNG\r\n";
             'outer: while ns_tx.send(command.as_bytes().to_vec()).await.is_ok() {
                 trace!("C: {command}");
+                loop {
+                    tokio::select! {
+                        reply = internal_rx.recv() => {
+                            if let Ok(InternalEvent::ServerReply(reply)) = reply {
+                                trace!("S: {reply}");
+                                let args: Vec<&str> = reply.split_ascii_whitespace().collect();
 
-                while let Ok(InternalEvent::ServerReply(reply)) = internal_rx.recv().await {
-                    trace!("S: {reply}");
-                    let args: Vec<&str> = reply.split_ascii_whitespace().collect();
+                                if *args.first().unwrap_or(&"") == "QNG" {
+                                    // Parse and sanity check to avoid spamming the server
+                                    if let Ok(duration) = args.get(1).unwrap_or(&"").parse()
+                                        && duration > 5
+                                    {
+                                        tokio::time::sleep(Duration::from_secs(duration)).await;
+                                        break;
+                                    } else {
+                                        break 'outer;
+                                    }
+                                }
+                            } else {
+                                break 'outer;
+                            }
+                        }
 
-                    if *args.first().unwrap_or(&"") == "QNG" {
-                        // Parse and sanity check to avoid spamming the server
-                        if let Ok(duration) = args.get(1).unwrap_or(&"").parse()
-                            && duration > 5
-                        {
-                            tokio::time::sleep(Duration::from_secs(duration)).await;
-                            break;
-                        } else {
+                        _ = task_cancellation_token.cancelled() => {
                             break 'outer;
                         }
                     }
@@ -154,41 +190,52 @@ impl Client {
             }
 
             event_tx.close();
+            task_cancellation_token.cancel();
         });
     }
 
     fn handle_switchboard_invitations(&self) {
         let event_tx = self.event_tx.clone();
         let mut internal_rx = self.internal_tx.subscribe();
-
         let user_data = self.user_data.clone();
-        tokio::spawn(async move {
-            while let Ok(event) = internal_rx.recv().await {
-                if let InternalEvent::SwitchboardInvitation {
-                    server,
-                    port,
-                    session_id,
-                    cki_string,
-                } = event
-                {
-                    let switchboard = Switchboard::new(
-                        server.as_str(),
-                        port.as_str(),
-                        cki_string.as_str(),
-                        user_data.clone(),
-                    )
-                    .await;
+        let task_cancellation_token = self.cancellation_token.clone();
 
-                    if let Ok(switchboard) = switchboard {
-                        let user_data = user_data.read().await;
-                        if let Some(ref user_email) = user_data.email
-                            && switchboard.answer(user_email, &session_id).await.is_ok()
-                            && let Err(error) = event_tx
-                                .send(Event::SessionAnswered(Arc::new(switchboard)))
-                                .await
-                        {
-                            error!("{error}");
-                        }
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    event = internal_rx.recv() => {
+                            if let Ok(event) = event && let InternalEvent::SwitchboardInvitation {
+                                server,
+                                port,
+                                session_id,
+                                cki_string,
+                            } = event
+                            {
+                                let switchboard = Switchboard::new(
+                                    server.as_str(),
+                                    port.as_str(),
+                                    cki_string.as_str(),
+                                    user_data.clone(),
+                                )
+                                .await;
+
+                                if let Ok(switchboard) = switchboard {
+                                    let user_data = user_data.read().await;
+                                    if let Some(ref user_email) = user_data.email
+                                        && switchboard.answer(user_email, &session_id).await.is_ok()
+                                        && let Err(error) = event_tx
+                                            .send(Event::SessionAnswered(Arc::new(switchboard)))
+                                            .await
+                                    {
+                                        error!("{error}");
+                                        break;
+                                    }
+                                }
+                            }
+                    }
+
+                    _ = task_cancellation_token.cancelled() => {
+                        break;
                     }
                 }
             }
@@ -277,6 +324,7 @@ impl Client {
 
         self.handle_switchboard_invitations();
         self.start_pinging();
+
         Ok(Event::Authenticated)
     }
 
@@ -523,6 +571,7 @@ impl Client {
             .or(Err(SdkError::TransmittingError))?;
 
         self.event_tx.close();
+        self.cancellation_token.cancel();
         Ok(())
     }
 }

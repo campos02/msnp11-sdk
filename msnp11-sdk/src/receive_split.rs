@@ -2,10 +2,22 @@ use crate::errors::sdk_error::SdkError;
 use core::str;
 use tokio::io::AsyncReadExt;
 use tokio::net::tcp::OwnedReadHalf;
+use tokio_util::sync::CancellationToken;
 
-pub(crate) async fn receive_split(rd: &mut OwnedReadHalf) -> Result<Vec<Vec<u8>>, SdkError> {
+pub(crate) async fn receive_split(
+    rd: &mut OwnedReadHalf,
+    cancellation_token: CancellationToken,
+) -> Result<Vec<Vec<u8>>, SdkError> {
     let mut buf = vec![0; 1664];
-    let received = rd.read(&mut buf).await.unwrap_or(0);
+    let received = tokio::select! {
+        received = rd.read(&mut buf) => {
+            received.unwrap_or(0)
+        }
+
+        _ = cancellation_token.cancelled() => {
+            return Err(SdkError::Disconnected);
+        }
+    };
 
     if received == 0 {
         return Err(SdkError::Disconnected);
@@ -37,7 +49,15 @@ pub(crate) async fn receive_split(rd: &mut OwnedReadHalf) -> Result<Vec<Vec<u8>>
                 let length = command.len() + length;
                 if length > messages_bytes.len() {
                     let mut buf = vec![0; 1664];
-                    let received = rd.read(&mut buf).await.unwrap_or(0);
+                    let received = tokio::select! {
+                        received = rd.read(&mut buf) => {
+                            received.unwrap_or(0)
+                        }
+
+                        _ = cancellation_token.cancelled() => {
+                            return Err(SdkError::Disconnected);
+                        }
+                    };
 
                     if received == 0 {
                         return Err(SdkError::Disconnected);

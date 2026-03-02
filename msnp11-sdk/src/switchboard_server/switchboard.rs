@@ -22,6 +22,7 @@ use std::sync::atomic::AtomicU32;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::{RwLock, broadcast, mpsc};
+use tokio_util::sync::CancellationToken;
 
 /// Represents a messaging session with one or more contacts. The official MSN clients usually create a new session every time a conversation
 /// window is opened and leave it once it's closed.
@@ -35,6 +36,7 @@ pub struct Switchboard {
     session_id: RwLock<Option<String>>,
     cki_string: String,
     user_data: Arc<RwLock<UserData>>,
+    cancellation_token: CancellationToken,
 }
 
 impl Switchboard {
@@ -53,20 +55,25 @@ impl Switchboard {
             .or(Err(SdkError::CouldNotConnectToServer))?;
 
         let (mut rd, mut wr) = socket.into_split();
-        let internal_task_tx = internal_tx.clone();
-        let event_task_tx = event_tx.clone();
+        let task_internal_tx = internal_tx.clone();
+        let task_event_tx = event_tx.clone();
+
+        let cancellation_token = CancellationToken::new();
+        let task_cancellation_token = cancellation_token.clone();
 
         tokio::spawn(async move {
-            'outer: while let Ok(messages) = receive_split(&mut rd).await {
+            'outer: while let Ok(messages) =
+                receive_split(&mut rd, task_cancellation_token.clone()).await
+            {
                 for message in messages {
                     let internal_event = into_internal_event(&message);
-                    if let Err(error) = internal_task_tx.send(internal_event) {
+                    if let Err(error) = task_internal_tx.send(internal_event) {
                         error!("{error}");
                     }
 
                     let event = into_event(&message);
                     if let Some(event) = event
-                        && let Err(error) = event_task_tx.send(event).await
+                        && let Err(error) = task_event_tx.send(event).await
                     {
                         error!("{error}");
                         break 'outer;
@@ -74,26 +81,42 @@ impl Switchboard {
                 }
             }
 
-            if let Err(error) = event_task_tx.send(Event::Disconnected).await {
+            if let Err(error) = task_event_tx.send(Event::Disconnected).await {
                 error!("{error}");
             }
 
-            event_task_tx.close();
+            task_event_tx.close();
+            task_cancellation_token.cancel();
         });
 
-        let event_task_tx = event_tx.clone();
+        let task_event_tx = event_tx.clone();
+        let task_cancellation_token = cancellation_token.clone();
+
         tokio::spawn(async move {
-            while let Some(message) = sb_rx.recv().await {
-                if let Err(error) = wr.write_all(message.as_slice()).await {
-                    error!("{error}");
+            loop {
+                tokio::select! {
+                    message = sb_rx.recv() => {
+                        if let Some(message) = message {
+                            if let Err(error) = wr.write_all(&message).await {
+                                error!("{error}")
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+
+                    _ = task_cancellation_token.cancelled() => {
+                        break;
+                    }
                 }
             }
 
-            if let Err(error) = event_task_tx.send(Event::Disconnected).await {
+            if let Err(error) = task_event_tx.send(Event::Disconnected).await {
                 error!("{error}");
             }
 
-            event_task_tx.close();
+            task_event_tx.close();
+            task_cancellation_token.cancel();
         });
 
         Ok(Self {
@@ -105,6 +128,7 @@ impl Switchboard {
             session_id: RwLock::new(None),
             cki_string: cki_string.to_string(),
             user_data,
+            cancellation_token,
         })
     }
 
@@ -112,44 +136,57 @@ impl Switchboard {
         let sb_tx = self.sb_tx.clone();
         let mut internal_rx = self.internal_tx.subscribe();
         let mut command_internal_rx = self.internal_tx.subscribe();
+        let task_cancellation_token = self.cancellation_token.clone();
 
         let tr_id = self.tr_id.clone();
         let user_data = self.user_data.clone();
 
         tokio::spawn(async move {
-            while let Ok(event) = internal_rx.recv().await {
-                match event {
-                    InternalEvent::P2PInvite {
-                        destination,
-                        message: invite,
-                    } => {
-                        let _ = p2p::send_display_picture::handle_invite(
-                            destination,
-                            invite,
-                            user_data.clone(),
-                            &mut command_internal_rx,
-                            tr_id.clone(),
-                            sb_tx.clone(),
-                        )
-                        .await;
+            loop {
+                tokio::select! {
+                    event = internal_rx.recv() => {
+                        if let Ok(event) = event {
+                            match event {
+                                InternalEvent::P2PInvite {
+                                    destination,
+                                    message: invite,
+                                } => {
+                                    let _ = p2p::send_display_picture::handle_invite(
+                                        destination,
+                                        invite,
+                                        user_data.clone(),
+                                        &mut command_internal_rx,
+                                        tr_id.clone(),
+                                        sb_tx.clone(),
+                                    )
+                                    .await;
+                                }
+
+                                InternalEvent::P2PBye {
+                                    destination,
+                                    message: bye,
+                                } => {
+                                    let _ = p2p::send_display_picture::handle_bye(
+                                        destination,
+                                        bye,
+                                        user_data.clone(),
+                                        &mut command_internal_rx,
+                                        tr_id.clone(),
+                                        sb_tx.clone(),
+                                    )
+                                    .await;
+                                }
+
+                                _ => (),
+                            }
+                        } else {
+                            break;
+                        }
                     }
 
-                    InternalEvent::P2PBye {
-                        destination,
-                        message: bye,
-                    } => {
-                        let _ = p2p::send_display_picture::handle_bye(
-                            destination,
-                            bye,
-                            user_data.clone(),
-                            &mut command_internal_rx,
-                            tr_id.clone(),
-                            sb_tx.clone(),
-                        )
-                        .await;
+                    _ = task_cancellation_token.cancelled() => {
+                        break;
                     }
-
-                    _ => (),
                 }
             }
         });
@@ -417,6 +454,7 @@ impl Switchboard {
             .or(Err(SdkError::TransmittingError))?;
 
         self.event_tx.close();
+        self.cancellation_token.cancel();
         Ok(())
     }
 }
