@@ -269,7 +269,7 @@ impl Switchboard {
         Ok(())
     }
 
-    /// Returns the session ID, if defined.
+    /// Returns the session ID.
     pub async fn get_session_id(&self) -> Result<String, MessagingError> {
         let session_id = self.session_id.read().await;
         session_id

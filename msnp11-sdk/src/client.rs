@@ -507,13 +507,13 @@ impl Client {
         gtc::send(&self.tr_id, &self.ns_tx, &mut internal_rx, gtc).await
     }
 
-    /// Sets the GTC value, which can be either `AL` or `BL`.
+    /// Sets the BLP value, which can be either `AL` or `BL`.
     pub async fn set_blp(&self, blp: &str) -> Result<(), SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         blp::send(&self.tr_id, &self.ns_tx, &mut internal_rx, blp).await
     }
 
-    /// Creates and returns a new Switchboard session with the specified contact.
+    /// Creates a new Switchboard session and invites the specified contact to it.
     pub async fn create_session(&self, email: &str) -> Result<Switchboard, SdkError> {
         let mut internal_rx = self.internal_tx.subscribe();
         let switchboard = xfr::send(
@@ -533,7 +533,7 @@ impl Client {
     }
 
     /// Sets the user's display picture, returning a standard base64 encoded hash of it.
-    /// This method uses the picture's binary data, and scaling down beforehand to a size like 200x200 is recommended.
+    /// This method uses the picture's binary data, and scaling down to a size like 200x200 beforehand is recommended.
     pub async fn set_display_picture(&self, display_picture: Vec<u8>) -> Result<String, SdkError> {
         let mut user_data = self.user_data.write().await;
         let user_email = user_data.email.as_ref().ok_or(SdkError::NotLoggedIn)?;
