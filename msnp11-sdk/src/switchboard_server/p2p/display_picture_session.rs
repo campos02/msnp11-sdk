@@ -3,7 +3,7 @@ use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::{DekuContainerRead, DekuContainerWrite};
-use rand::RngCore;
+use rand::Rng;
 use rand::rng;
 use std::error::Error;
 use std::io::Cursor;

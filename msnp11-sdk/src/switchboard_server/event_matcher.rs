@@ -63,11 +63,11 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
 }
 
 pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
-    let reply = unsafe { str::from_utf8_unchecked(message.as_slice()) }.to_string();
+    let reply = unsafe { str::from_utf8_unchecked(message) }.to_string();
     let command = reply.lines().next().unwrap_or_default().to_string() + "\r\n";
 
-    let args: Vec<&str> = command.split_ascii_whitespace().collect();
-    match *args.first().unwrap_or(&"") {
+    let mut args = command.split_ascii_whitespace();
+    match args.next().unwrap_or("") {
         "MSG" => {
             let payload = reply.replace(command.as_str(), "");
             let Some(content_type) = payload.lines().nth(1) else {

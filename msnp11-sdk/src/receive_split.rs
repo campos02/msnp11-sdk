@@ -28,25 +28,26 @@ pub(crate) async fn receive_split(
 
     loop {
         let messages_string = unsafe { str::from_utf8_unchecked(&messages_bytes) };
-        let Some(command) = messages_string.lines().next() else {
+        let Some(message) = messages_string.lines().next() else {
             break;
         };
 
-        let command = command.to_string() + "\r\n";
-        let args: Vec<&str> = command.split_ascii_whitespace().collect();
+        let message = message.to_string() + "\r\n";
+        let mut args = message.split_ascii_whitespace();
+        let command = args.next().unwrap_or("");
 
-        match *args.first().unwrap_or(&"") {
+        match command {
             "GCF" | "UBX" | "MSG" => {
-                let length_index = match *args.first().unwrap_or(&"") {
-                    "UBX" => 2,
-                    _ => 3,
+                let length_index = match command {
+                    "UBX" => 1,
+                    _ => 2,
                 };
 
-                let Ok(length) = args.get(length_index).unwrap_or(&"").parse::<usize>() else {
+                let Ok(length) = args.nth(length_index).unwrap_or("").parse::<usize>() else {
                     continue;
                 };
 
-                let length = command.len() + length;
+                let length = message.len() + length;
                 if length > messages_bytes.len() {
                     let mut buf = vec![0; 1664];
                     let received = tokio::select! {
@@ -73,7 +74,7 @@ pub(crate) async fn receive_split(
             }
 
             _ => {
-                let length = command.len();
+                let length = message.len();
                 if length > messages_bytes.len() {
                     break;
                 }
