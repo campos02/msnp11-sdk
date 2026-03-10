@@ -6,7 +6,8 @@ use crate::switchboard_server::switchboard::Switchboard;
 use std::sync::Arc;
 
 /// Contact and messaging events.
-#[derive(Debug, Clone, uniffi::Enum)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 pub enum Event {
     /// The Dispatch Server replied with a command asking to connect to a Notification Server.
     RedirectedTo { server: String, port: u16 },

@@ -1,5 +1,6 @@
 /// Errors when using P2P features like display picture transfers.
-#[derive(Debug, uniffi::Error, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 pub enum P2pError {
     #[error("P2P session kind not supported")]
     P2pInvite,

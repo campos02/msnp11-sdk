@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug, Clone, uniffi::Record)]
+#[derive(Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Tab {
     #[serde(rename = "type")]
     pub tab_type: String,

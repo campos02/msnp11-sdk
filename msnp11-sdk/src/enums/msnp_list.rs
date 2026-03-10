@@ -1,5 +1,6 @@
 /// MSNP lists.
-#[derive(Debug, Clone, PartialEq, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 pub enum MsnpList {
     /// Your contact list as it appears in the client.
     ForwardList,

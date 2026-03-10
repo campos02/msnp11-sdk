@@ -1,5 +1,6 @@
 /// General errors the SDK might return.
-#[derive(Debug, uniffi::Error, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 pub enum SdkError {
     #[error("Could not resolve server name")]
     ResolutionError,

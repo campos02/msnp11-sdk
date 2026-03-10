@@ -2,7 +2,8 @@ use crate::enums::msnp_status::MsnpStatus;
 use crate::models::msn_object::MsnObject;
 
 /// Represents a contact's presence information.
-#[derive(Debug, Clone, uniffi::Record)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Presence {
     pub status: MsnpStatus,
     pub client_id: u64,

@@ -3,6 +3,7 @@ use crate::enums::internal_event::InternalEvent;
 use crate::errors::messaging_error::MessagingError;
 use crate::errors::p2p_error::P2pError;
 use crate::errors::sdk_error::SdkError;
+#[cfg(feature = "uniffi")]
 use crate::event_handler::EventHandler;
 use crate::models::plain_text::PlainText;
 use crate::models::user_data::UserData;
@@ -26,7 +27,8 @@ use tokio_util::sync::CancellationToken;
 
 /// Represents a messaging session with one or more contacts. The official MSN clients usually create a new session every time a conversation
 /// window is opened and leave it once it's closed.
-#[derive(Debug, uniffi::Object)]
+#[derive(Debug)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct Switchboard {
     event_tx: async_channel::Sender<Event>,
     event_rx: async_channel::Receiver<Event>,
@@ -245,6 +247,7 @@ impl Switchboard {
         });
     }
 
+    #[cfg(feature = "uniffi")]
     /// Adds a new handler that implements the [EventHandler] trait.
     ///
     /// This exists for the foreign language bindings, with which generics don't

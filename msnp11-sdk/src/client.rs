@@ -4,6 +4,7 @@ use crate::enums::msnp_list::MsnpList;
 use crate::enums::msnp_status::MsnpStatus;
 use crate::errors::contact_error::ContactError;
 use crate::errors::sdk_error::SdkError;
+#[cfg(feature = "uniffi")]
 use crate::event_handler::EventHandler;
 #[cfg(feature = "config")]
 use crate::http::config::Config;
@@ -255,6 +256,7 @@ impl Client {
         });
     }
 
+    #[cfg(feature = "uniffi")]
     /// Adds a new handler that implements the [EventHandler] trait.
     ///
     /// This exists for the foreign language bindings, with which generics don't

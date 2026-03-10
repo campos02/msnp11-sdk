@@ -1,5 +1,6 @@
 /// Errors when performing contact actions.
-#[derive(Debug, uniffi::Error, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 pub enum ContactError {
     #[error("Server returned an error while logging in")]
     ServerError,

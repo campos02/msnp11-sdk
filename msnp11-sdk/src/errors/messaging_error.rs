@@ -1,5 +1,6 @@
 /// Errors when sending messages.
-#[derive(Debug, uniffi::Error, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 pub enum MessagingError {
     #[error("Error receiving data")]
     ReceivingError,

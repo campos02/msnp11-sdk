@@ -7,11 +7,13 @@
       <w>clcid</w>
       <w>cmsnobj</w>
       <w>contenttype</w>
+      <w>contenturl</w>
       <w>ctsrv</w>
       <w>davq</w>
       <w>ecom</w>
       <w>emsn</w>
       <w>fmessenger</w>
+      <w>hiturl</w>
       <w>jcho</w>
       <w>msgrsvcs</w>
       <w>msmsgs</w>
@@ -23,10 +25,13 @@
       <w>msnobject</w>
       <w>msnp</w>
       <w>msnslp</w>
+      <w>notificationid</w>
       <w>passporturls</w>
       <w>plcid</w>
       <w>sessionreqbody</w>
+      <w>siteid</w>
       <w>tfrddf</w>
+      <w>uniffi</w>
       <w>vjplt</w>
     </words>
   </dictionary>

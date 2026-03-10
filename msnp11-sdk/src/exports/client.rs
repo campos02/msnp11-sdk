@@ -2,7 +2,7 @@ use crate::enums::msnp_status::MsnpStatus;
 use crate::errors::contact_error::ContactError;
 use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
-use crate::{Event, MsnpList, PersonalMessage, Switchboard, Tab};
+use crate::{Config, Event, MsnpList, PersonalMessage, Switchboard};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -51,7 +51,7 @@ impl Client {
     }
 
     /// Makes a request to get the config file (containing tabs and the MSN Today url) and returns it.
-    pub async fn get_config(&self, config_url: &str) -> Result<Vec<Tab>, SdkError> {
+    pub async fn get_config(&self, config_url: &str) -> Result<Config, SdkError> {
         self.rt
             .block_on(async { self.inner.get_config(config_url).await })
     }

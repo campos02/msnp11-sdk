@@ -1,5 +1,6 @@
 /// MSNP presence statuses.
-#[derive(Debug, Clone, PartialEq, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 pub enum MsnpStatus {
     Online,
     Busy,

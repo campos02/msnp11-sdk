@@ -53,6 +53,7 @@
 pub mod client;
 pub mod enums;
 mod errors;
+#[cfg(feature = "uniffi")]
 pub mod event_handler;
 #[cfg(feature = "uniffi")]
 mod exports;
@@ -62,6 +63,7 @@ mod notification_server;
 mod receive_split;
 pub mod switchboard_server;
 
+#[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
 
 pub use client::Client;
