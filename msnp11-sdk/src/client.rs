@@ -160,11 +160,11 @@ impl Client {
                         reply = internal_rx.recv() => {
                             if let Ok(InternalEvent::ServerReply(reply)) = reply {
                                 trace!("S: {reply}");
-                                let args: Vec<&str> = reply.split_ascii_whitespace().collect();
 
-                                if *args.first().unwrap_or(&"") == "QNG" {
+                                let mut args = reply.split_ascii_whitespace();
+                                if args.next().unwrap_or("") == "QNG" {
                                     // Parse and sanity check to avoid spamming the server
-                                    if let Ok(duration) = args.get(1).unwrap_or(&"").parse()
+                                    if let Ok(duration) = args.next().unwrap_or("").parse()
                                         && duration > 5
                                     {
                                         tokio::time::sleep(Duration::from_secs(duration)).await;
@@ -173,8 +173,6 @@ impl Client {
                                         break 'outer;
                                     }
                                 }
-                            } else {
-                                break 'outer;
                             }
                         }
 
