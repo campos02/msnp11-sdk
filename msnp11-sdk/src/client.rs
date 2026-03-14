@@ -540,8 +540,8 @@ impl Client {
 
         let mut hash = sha1_smol::Sha1::new();
         hash.update(display_picture.as_slice());
-        let sha1d = STANDARD.encode(hash.digest().bytes());
 
+        let sha1d = STANDARD.encode(hash.digest().bytes());
         let sha1c = format!(
             "Creator{user_email}Size{}Type3LocationPIC.tmpFriendlyAAA=SHA1D{sha1d}",
             display_picture.len()
@@ -549,8 +549,8 @@ impl Client {
 
         let mut hash = sha1_smol::Sha1::new();
         hash.update(sha1c.as_bytes());
-        let sha1c = STANDARD.encode(hash.digest().bytes());
 
+        let sha1c = STANDARD.encode(hash.digest().bytes());
         user_data.msn_object = Some(format!(
             "<msnobj Creator=\"{user_email}\" Size=\"{}\" Type=\"3\" Location=\"PIC.tmp\" Friendly=\"AAA=\" SHA1D=\"{sha1d}\" SHA1C=\"{sha1c}\"/>",
             display_picture.len()

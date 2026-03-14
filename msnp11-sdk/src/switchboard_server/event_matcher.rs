@@ -62,7 +62,7 @@ pub fn into_event(message: &Vec<u8>) -> Option<Event> {
     }
 }
 
-pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
+pub fn into_internal_event(message: &[u8]) -> InternalEvent {
     let reply = unsafe { str::from_utf8_unchecked(message) }.to_string();
     let command = reply.lines().next().unwrap_or_default().to_string() + "\r\n";
 
@@ -131,6 +131,7 @@ pub fn into_internal_event(message: &Vec<u8>) -> InternalEvent {
 
             InternalEvent::ServerReply(reply)
         }
+
         _ => InternalEvent::ServerReply(reply),
     }
 }

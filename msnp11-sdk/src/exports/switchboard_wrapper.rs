@@ -66,9 +66,11 @@ impl SwitchboardWrapper {
         email: &str,
         msn_object: &str,
     ) -> Result<(), P2pError> {
-        self.inner
-            .request_contact_display_picture(email, msn_object)
-            .await
+        self.rt.block_on(async {
+            self.inner
+                .request_contact_display_picture(email, msn_object)
+                .await
+        })
     }
 
     /// Disconnects from the Switchboard.
