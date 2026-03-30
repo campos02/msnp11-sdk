@@ -65,7 +65,7 @@ pub async fn send(
                                 email: email.to_owned(),
                                 display_name: display_name.to_owned(),
                                 guid: guid.replace("C=", ""),
-                                lists: vec![MsnpList::ForwardList],
+                                lists: vec![MsnpList::ForwardList, MsnpList::AllowList],
                                 groups: vec![],
                             });
                         }
@@ -134,7 +134,6 @@ pub async fn send_with_group(
         .or(Err(ContactError::TransmittingError))?;
 
     trace!("C: {command}");
-
     loop {
         if let InternalEvent::ServerReply(reply) = internal_rx
             .recv()
