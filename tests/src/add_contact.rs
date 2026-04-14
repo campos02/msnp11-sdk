@@ -64,7 +64,10 @@ async fn add_contact() {
         assert_eq!(groups.len(), 0);
         assert_eq!(
             lists,
-            vec![msnp11_sdk::enums::msnp_list::MsnpList::ForwardList]
+            vec![
+                msnp11_sdk::enums::msnp_list::MsnpList::ForwardList,
+                msnp11_sdk::enums::msnp_list::MsnpList::AllowList
+            ]
         );
     }
 

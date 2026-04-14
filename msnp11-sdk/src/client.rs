@@ -1,3 +1,4 @@
+use crate::MsnObject;
 use crate::enums::event::Event;
 use crate::enums::internal_event::InternalEvent;
 use crate::enums::msnp_list::MsnpList;
@@ -529,6 +530,7 @@ impl Client {
 
         switchboard.login(user_email).await?;
         switchboard.invite(email).await?;
+
         Ok(switchboard)
     }
 
@@ -551,11 +553,20 @@ impl Client {
         hash.update(sha1c.as_bytes());
 
         let sha1c = STANDARD.encode(hash.digest().bytes());
-        user_data.msn_object = Some(format!(
-            "<msnobj Creator=\"{user_email}\" Size=\"{}\" Type=\"3\" Location=\"PIC.tmp\" Friendly=\"AAA=\" SHA1D=\"{sha1d}\" SHA1C=\"{sha1c}\"/>",
-            display_picture.len()
-        ));
+        let msn_object = MsnObject {
+            creator: (*user_email).clone(),
+            size: display_picture.len() as u32,
+            object_type: 3,
+            location: "PIC.tmp".to_string(),
+            friendly: "AAA=".to_string(),
+            sha1d: sha1d.clone(),
+            sha1c: Some(sha1c),
+            content_type: None,
+        };
 
+        user_data.msn_object =
+            Some(quick_xml::se::to_string(&msn_object).or(Err(SdkError::CouldNotCreateMsnObject))?);
+        
         user_data.display_picture = Some(display_picture);
         Ok(sha1d)
     }
@@ -572,6 +583,7 @@ impl Client {
 
         self.event_tx.close();
         self.cancellation_token.cancel();
+
         Ok(())
     }
 }
