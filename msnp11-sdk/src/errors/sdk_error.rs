@@ -34,7 +34,7 @@ pub enum SdkError {
     InvalidContact,
     #[error("The contact you're trying to invite is offline")]
     ContactIsOffline,
-    #[error("Could create an MSN object for the display picture")]
+    #[error("Could not create an MSN object for the display picture")]
     CouldNotCreateMsnObject,
     #[cfg(feature = "config")]
     #[error("Error requesting config file")]

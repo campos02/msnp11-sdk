@@ -546,7 +546,7 @@ impl Client {
         let sha1d = STANDARD.encode(hash.digest().bytes());
         let sha1c = format!(
             "Creator{user_email}Size{}Type3LocationPIC.tmpFriendlyAAA=SHA1D{sha1d}",
-            display_picture.len()
+            display_picture.len() as u32
         );
 
         let mut hash = sha1_smol::Sha1::new();
@@ -566,7 +566,7 @@ impl Client {
 
         user_data.msn_object =
             Some(quick_xml::se::to_string(&msn_object).or(Err(SdkError::CouldNotCreateMsnObject))?);
-        
+
         user_data.display_picture = Some(display_picture);
         Ok(sha1d)
     }
