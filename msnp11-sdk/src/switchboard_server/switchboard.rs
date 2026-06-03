@@ -12,7 +12,7 @@ use crate::switchboard_server::commands::{ans, cal, msg, usr};
 use crate::switchboard_server::event_matcher::{into_event, into_internal_event};
 use crate::switchboard_server::p2p;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
-use crate::switchboard_server::p2p::display_picture_session::DisplayPictureSession;
+use crate::switchboard_server::p2p::p2p_session::P2pSession;
 use core::str;
 use deku::DekuContainerRead;
 use log::{error, trace};
@@ -149,7 +149,7 @@ impl Switchboard {
                     event = internal_rx.recv() => {
                         if let Ok(event) = event {
                             match event {
-                                InternalEvent::P2PInvite {
+                                InternalEvent::P2pInvite {
                                     destination,
                                     message: invite,
                                 } => {
@@ -164,7 +164,7 @@ impl Switchboard {
                                     .await;
                                 }
 
-                                InternalEvent::P2PBye {
+                                InternalEvent::P2pBye {
                                     destination,
                                     message: bye,
                                 } => {
@@ -305,13 +305,13 @@ impl Switchboard {
         msn_object: &str,
     ) -> Result<(), P2pError> {
         let mut internal_rx = self.internal_tx.subscribe();
-        let mut session = DisplayPictureSession::new();
+        let mut session = P2pSession::new();
 
         let invite;
         {
             let user_data = self.user_data.read().await;
             let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-            invite = session.invite(email, user_email, msn_object)?
+            invite = session.picture_invite(email, user_email, msn_object)?
         }
 
         {
@@ -322,7 +322,7 @@ impl Switchboard {
         let mut picture = Vec::new();
         loop {
             match internal_rx.recv().await.or(Err(P2pError::ReceivingError))? {
-                InternalEvent::P2PShouldAck {
+                InternalEvent::P2pShouldAck {
                     destination,
                     message,
                 } => {
@@ -336,11 +336,11 @@ impl Switchboard {
                     }
 
                     let mut internal_rx = self.internal_tx.subscribe();
-                    let ack = DisplayPictureSession::acknowledge(&message)?;
+                    let ack = P2pSession::acknowledge(&message)?;
                     msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
                 }
 
-                InternalEvent::P2PInvite {
+                InternalEvent::P2pInvite {
                     destination,
                     message: invite,
                 } => {
@@ -375,8 +375,8 @@ impl Switchboard {
                         .replace("From: <msnmsgr:", "")
                         .replace(">", "");
 
-                    let session = DisplayPictureSession::new_from_invite(&invite)
-                        .or(Err(P2pError::InviteError))?;
+                    let session =
+                        P2pSession::new_from_invite(&invite).or(Err(P2pError::InviteError))?;
 
                     let decline = session
                         .decline(from.as_str(), to)
@@ -386,7 +386,7 @@ impl Switchboard {
                         .await?;
                 }
 
-                InternalEvent::P2PData {
+                InternalEvent::P2pData {
                     destination,
                     message: data,
                 } => {
@@ -412,7 +412,7 @@ impl Switchboard {
                     trace!("Data received so far: {data_len}");
 
                     if data_len as u64 == binary_header.total_data_size {
-                        let ack = DisplayPictureSession::acknowledge(&data)?;
+                        let ack = P2pSession::acknowledge(&data)?;
                         msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email)
                             .await?;
 

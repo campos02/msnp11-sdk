@@ -14,22 +14,22 @@ pub(crate) enum InternalEvent {
         port: u16,
     },
 
-    P2PInvite {
+    P2pInvite {
         destination: String,
         message: Vec<u8>,
     },
 
-    P2PShouldAck {
+    P2pShouldAck {
         destination: String,
         message: Vec<u8>,
     },
 
-    P2PData {
+    P2pData {
         destination: String,
         message: Vec<u8>,
     },
 
-    P2PBye {
+    P2pBye {
         destination: String,
         message: Vec<u8>,
     },

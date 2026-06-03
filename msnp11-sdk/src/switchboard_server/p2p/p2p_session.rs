@@ -1,5 +1,6 @@
 use crate::errors::p2p_error::P2pError;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
+use crate::switchboard_server::p2p::file_context::FileContext;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::{DekuContainerRead, DekuContainerWrite};
@@ -8,14 +9,14 @@ use rand::rng;
 use std::error::Error;
 use std::io::Cursor;
 
-pub struct DisplayPictureSession {
+pub struct P2pSession {
     session_id: u32,
     base_identifier: u32,
     branch: String,
     call_id: String,
 }
 
-impl DisplayPictureSession {
+impl P2pSession {
     pub fn new() -> Self {
         Self {
             session_id: 0,
@@ -27,7 +28,6 @@ impl DisplayPictureSession {
 
     pub fn new_from_invite(invite: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
         let mut invite = unsafe { str::from_utf8_unchecked(invite.as_slice()) }.split("\r\n");
-
         let Some(branch) =
             invite.find(|parameter| parameter.starts_with("Via: MSNSLP/1.0/TLP ;branch={"))
         else {
@@ -43,13 +43,11 @@ impl DisplayPictureSession {
         };
 
         let call_id = call_id.replace("Call-ID: {", "").replace("}", "");
-
         let Some(session_id) = invite.find(|parameter| parameter.starts_with("SessionID: ")) else {
             return Err(P2pError::P2pInvite.into());
         };
 
         let session_id = session_id.replace("SessionID: ", "").parse::<u32>()?;
-
         Ok(Self {
             session_id,
             base_identifier: rng().next_u32(),
@@ -58,13 +56,14 @@ impl DisplayPictureSession {
         })
     }
 
-    pub fn invite(&mut self, to: &str, from: &str, msn_object: &str) -> Result<Vec<u8>, P2pError> {
-        let branch = guid_create::GUID::rand().to_string();
-        let call_id = guid_create::GUID::rand().to_string();
-        let session_id = rng().next_u32();
-
+    pub fn picture_invite(
+        &mut self,
+        to: &str,
+        from: &str,
+        msn_object: &str,
+    ) -> Result<Vec<u8>, P2pError> {
         let mut body = "EUF-GUID: {A4268EEC-FEC5-49E5-95C3-F126696BDBF6}\r\n".to_string();
-        body.push_str(format!("SessionID: {session_id}\r\n").as_str());
+        body.push_str(format!("SessionID: {}\r\n", rng().next_u32()).as_str());
         body.push_str("AppID: 1\r\n");
         body.push_str(
             format!(
@@ -73,6 +72,51 @@ impl DisplayPictureSession {
             )
             .as_str(),
         );
+
+        self.invite(to, from, &body)
+    }
+
+    pub fn file_invite(
+        &mut self,
+        to: &str,
+        from: &str,
+        file_name: &str,
+        file_size: u64,
+    ) -> Result<Vec<u8>, P2pError> {
+        let mut utf16_file_name = Vec::with_capacity(554);
+        let file_name = file_name.encode_utf16();
+
+        for character in file_name {
+            for byte in character.to_le_bytes() {
+                utf16_file_name.push(byte);
+            }
+        }
+
+        utf16_file_name.resize(utf16_file_name.capacity() - 4, 0);
+        utf16_file_name.extend_from_slice(&[255; 4]);
+
+        // 574 will work with the official clients, 1 means no preview
+        let context = FileContext {
+            size: 574,
+            second_field: 2,
+            file_size,
+            preview: 1,
+            file_name: utf16_file_name,
+        }
+        .to_bytes()
+        .or(Err(P2pError::InviteError))?;
+
+        let mut body = "EUF-GUID: {5D3E02AB-6190-11D3-BBBB-00C04F795683}\r\n".to_string();
+        body.push_str(format!("SessionID: {}\r\n", rng().next_u32()).as_str());
+        body.push_str("AppID: 2\r\n");
+        body.push_str(format!("Context: {}\r\n\r\n\0", STANDARD.encode(context)).as_str());
+
+        self.invite(to, from, &body)
+    }
+
+    fn invite(&mut self, to: &str, from: &str, body: &str) -> Result<Vec<u8>, P2pError> {
+        let branch = guid_create::GUID::rand().to_string();
+        let call_id = guid_create::GUID::rand().to_string();
 
         let mut headers = format!("INVITE MSNMSGR:{to} MSNSLP/1.0\r\n");
         headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());

@@ -2,7 +2,7 @@ use crate::enums::internal_event::InternalEvent;
 use crate::errors::p2p_error::P2pError;
 use crate::models::user_data::UserData;
 use crate::switchboard_server::commands::msg;
-use crate::switchboard_server::p2p::display_picture_session::DisplayPictureSession;
+use crate::switchboard_server::p2p::p2p_session::P2pSession;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use std::sync::Arc;
@@ -51,8 +51,8 @@ pub async fn handle_invite(
         .replace("From: <msnmsgr:", "")
         .replace(">", "");
 
-    let session = DisplayPictureSession::new_from_invite(&invite)?;
-    let ack_payload = DisplayPictureSession::acknowledge(&invite)?;
+    let session = P2pSession::new_from_invite(&invite)?;
+    let ack_payload = P2pSession::acknowledge(&invite)?;
 
     msg::send_p2p(
         &tr_id,
@@ -147,7 +147,7 @@ pub async fn handle_bye(
         .replace("From: <msnmsgr:", "")
         .replace(">", "");
 
-    let ack_payload = DisplayPictureSession::acknowledge(&bye)?;
+    let ack_payload = P2pSession::acknowledge(&bye)?;
 
     msg::send_p2p(
         &tr_id,

@@ -101,28 +101,28 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                 if binary_header.total_data_size == 4 && binary_payload[48..52].eq(&[0; 4])
                     || payload.contains("200 OK")
                 {
-                    return InternalEvent::P2PShouldAck {
+                    return InternalEvent::P2pShouldAck {
                         destination,
                         message: binary_payload,
                     };
                 }
 
                 if binary_header.flag == 0x20 || binary_header.flag == 0x1000020 {
-                    return InternalEvent::P2PData {
+                    return InternalEvent::P2pData {
                         destination,
                         message: binary_payload[..(binary_payload.len() - 4)].to_vec(),
                     };
                 }
 
                 if payload.contains("INVITE") {
-                    return InternalEvent::P2PInvite {
+                    return InternalEvent::P2pInvite {
                         destination,
                         message: binary_payload,
                     };
                 }
 
                 if payload.contains("BYE") {
-                    return InternalEvent::P2PBye {
+                    return InternalEvent::P2pBye {
                         destination,
                         message: binary_payload,
                     };

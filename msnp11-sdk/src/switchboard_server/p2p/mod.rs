@@ -1,3 +1,4 @@
 pub mod binary_header;
-pub mod display_picture_session;
+mod file_context;
+pub mod p2p_session;
 pub mod send_display_picture;
