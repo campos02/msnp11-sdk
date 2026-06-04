@@ -50,16 +50,12 @@ pub async fn send(
 
             let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
-                "CHG" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Ok(());
-                    }
+                "CHG" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Ok(());
                 }
 
-                "201" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::InvalidArgument);
-                    }
+                "201" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(SdkError::InvalidArgument);
                 }
 
                 _ => (),

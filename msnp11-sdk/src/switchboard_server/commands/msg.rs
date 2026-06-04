@@ -35,22 +35,16 @@ pub async fn send_text_message(
 
             let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
-                "ACK" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Ok(());
-                    }
+                "ACK" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Ok(());
                 }
 
-                "NAK" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(MessagingError::MessageNotDelivered);
-                    }
+                "NAK" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(MessagingError::MessageNotDelivered);
                 }
 
-                "282" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(MessagingError::MessageNotDelivered);
-                    }
+                "282" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(MessagingError::MessageNotDelivered);
                 }
 
                 _ => (),
@@ -89,22 +83,16 @@ pub async fn send_nudge(
 
             let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
-                "ACK" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Ok(());
-                    }
+                "ACK" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Ok(());
                 }
 
-                "NAK" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(MessagingError::MessageNotDelivered);
-                    }
+                "NAK" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(MessagingError::MessageNotDelivered);
                 }
 
-                "282" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(MessagingError::MessageNotDelivered);
-                    }
+                "282" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(MessagingError::MessageNotDelivered);
                 }
 
                 _ => (),
@@ -172,22 +160,16 @@ pub async fn send_p2p(
 
             let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
-                "ACK" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Ok(());
-                    }
+                "ACK" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Ok(());
                 }
 
-                "NAK" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(P2pError::MessageNotDelivered);
-                    }
+                "NAK" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(P2pError::MessageNotDelivered);
                 }
 
-                "282" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(P2pError::MessageNotDelivered);
-                    }
+                "282" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(P2pError::MessageNotDelivered);
                 }
 
                 _ => (),

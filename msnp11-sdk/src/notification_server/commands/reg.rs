@@ -33,25 +33,20 @@ pub async fn send(
 
             let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
-                "REG" => {
+                "REG"
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string()
                         && *args.get(3).unwrap_or(&"") == new_name
-                        && *args.get(4).unwrap_or(&"") == guid
-                    {
-                        return Ok(());
-                    }
+                        && *args.get(4).unwrap_or(&"") == guid =>
+                {
+                    return Ok(());
                 }
 
-                "224" | "228" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(ContactError::InvalidArgument);
-                    }
+                "224" | "228" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(ContactError::InvalidArgument);
                 }
 
-                "603" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(ContactError::ServerError);
-                    }
+                "603" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(ContactError::ServerError);
                 }
 
                 _ => (),

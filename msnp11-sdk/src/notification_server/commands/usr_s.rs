@@ -29,24 +29,19 @@ pub async fn send(
 
             let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
-                "USR" => {
+                "USR"
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string()
-                        && *args.get(2).unwrap_or(&"") == "OK"
-                    {
-                        return Ok(());
-                    }
+                        && *args.get(2).unwrap_or(&"") == "OK" =>
+                {
+                    return Ok(());
                 }
 
-                "500" | "910" | "921" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::ServerError);
-                    }
+                "500" | "910" | "921" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(SdkError::ServerError);
                 }
 
-                "911" | "923" | "928" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::ServerIsBusy);
-                    }
+                "911" | "923" | "928" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(SdkError::ServerIsBusy);
                 }
 
                 _ => (),

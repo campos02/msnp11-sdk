@@ -41,32 +41,27 @@ pub async fn send(
                     }
                 }
 
-                "XFR" => {
+                "XFR"
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string()
-                        && *args.get(2).unwrap_or(&"") == "NS"
+                        && *args.get(2).unwrap_or(&"") == "NS" =>
+                {
+                    let mut server_and_port = args.get(3).unwrap_or(&"").split(":");
+                    if let Some(server) = server_and_port.next()
+                        && let Some(port) = server_and_port.next()
                     {
-                        let mut server_and_port = args.get(3).unwrap_or(&"").split(":");
-                        if let Some(server) = server_and_port.next()
-                            && let Some(port) = server_and_port.next()
-                        {
-                            return Ok(InternalEvent::RedirectedTo {
-                                server: server.to_string(),
-                                port: port.parse::<u16>().unwrap_or(1863),
-                            });
-                        }
+                        return Ok(InternalEvent::RedirectedTo {
+                            server: server.to_string(),
+                            port: port.parse::<u16>().unwrap_or(1863),
+                        });
                     }
                 }
 
-                "500" | "601" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::ServerError);
-                    }
+                "500" | "601" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(SdkError::ServerError);
                 }
 
-                "911" | "931" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::ServerIsBusy);
-                    }
+                "911" | "931" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(SdkError::ServerIsBusy);
                 }
 
                 _ => (),

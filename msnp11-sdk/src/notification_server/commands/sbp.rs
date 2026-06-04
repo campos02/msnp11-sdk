@@ -33,32 +33,25 @@ pub async fn send(
 
             let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
-                "SBP" => {
+                "SBP"
                     if *args.get(1).unwrap_or(&"") == tr_id.to_string()
                         && *args.get(2).unwrap_or(&"") == guid
                         && *args.get(3).unwrap_or(&"") == "MFN"
-                        && *args.get(4).unwrap_or(&"") == display_name
-                    {
-                        return Ok(());
-                    }
+                        && *args.get(4).unwrap_or(&"") == display_name =>
+                {
+                    return Ok(());
                 }
 
-                "201" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(ContactError::InvalidArgument);
-                    }
+                "201" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(ContactError::InvalidArgument);
                 }
 
-                "208" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(ContactError::InvalidContact);
-                    }
+                "208" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(ContactError::InvalidContact);
                 }
 
-                "603" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(ContactError::ServerError);
-                    }
+                "603" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(ContactError::ServerError);
                 }
 
                 _ => (),

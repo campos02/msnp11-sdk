@@ -32,16 +32,12 @@ pub async fn send(
 
             let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
-                "CVR" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Ok(());
-                    }
+                "CVR" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Ok(());
                 }
 
-                "420" | "710" | "731" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::ServerError);
-                    }
+                "420" | "710" | "731" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(SdkError::ServerError);
                 }
 
                 _ => (),

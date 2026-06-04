@@ -38,16 +38,12 @@ pub async fn send(
                     }
                 }
 
-                "208" | "215" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::InvalidContact);
-                    }
+                "208" | "215" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(SdkError::InvalidContact);
                 }
 
-                "216" | "217" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::ContactIsOffline);
-                    }
+                "216" | "217" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(SdkError::ContactIsOffline);
                 }
 
                 _ => (),

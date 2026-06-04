@@ -28,16 +28,12 @@ pub async fn send(
 
             let args: Vec<&str> = reply.split_ascii_whitespace().collect();
             match *args.first().unwrap_or(&"") {
-                "SYN" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Ok(());
-                    }
+                "SYN" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Ok(());
                 }
 
-                "603" => {
-                    if *args.get(1).unwrap_or(&"") == tr_id.to_string() {
-                        return Err(SdkError::ServerError);
-                    }
+                "603" if *args.get(1).unwrap_or(&"") == tr_id.to_string() => {
+                    return Err(SdkError::ServerError);
                 }
 
                 _ => (),
