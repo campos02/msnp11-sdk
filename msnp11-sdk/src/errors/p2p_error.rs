@@ -26,4 +26,6 @@ pub enum P2pError {
     CouldNotGetUserData,
     #[error("Could not get contact display picture")]
     CouldNotGetDisplayPicture,
+    #[error("Could not get device IP address")]
+    CouldNotGetIpAddress,
 }

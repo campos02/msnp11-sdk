@@ -24,12 +24,14 @@ uniffi = { version = "0.31.0", optional = true }
 async-channel = "2.5.0"
 async-trait = { version = "0.1.89", optional = true }
 thiserror = "2.0.17"
+getifs = { version =  "0.6.1", optional = true }
 
 [build-dependencies]
 uniffi = { version = "0.31.0", features = [ "build" ], optional = true }
 
 [features]
 config = []
+file-transfers = ["dep:getifs"]
 uniffi = ["config", "dep:uniffi", "dep:async-trait"]
 
 [lib]

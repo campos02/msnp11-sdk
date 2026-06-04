@@ -98,9 +98,7 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                     return InternalEvent::ServerReply(reply);
                 };
 
-                if binary_header.total_data_size == 4 && binary_payload[48..52].eq(&[0; 4])
-                    || payload.contains("200 OK")
-                {
+                if binary_header.total_data_size == 4 && binary_payload[48..52].eq(&[0; 4]) {
                     return InternalEvent::P2pShouldAck {
                         destination,
                         message: binary_payload,
@@ -111,6 +109,64 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                     return InternalEvent::P2pData {
                         destination,
                         message: binary_payload[..(binary_payload.len() - 4)].to_vec(),
+                    };
+                }
+
+                if payload.contains("200 OK") {
+                    #[cfg(feature = "file-transfers")]
+                    if payload.contains("application/x-msnmsgr-transrespbody") {
+                        let lines = payload.lines();
+
+                        let mut bridge = None;
+                        let mut listening = None;
+                        let mut ips = None;
+                        let mut port = None;
+
+                        for line in lines {
+                            if line.contains("Bridge: ") {
+                                bridge = Some(line.replace("Bridge: ", ""));
+                            } else if line.contains("Listening: ") {
+                                listening = Some(line.contains("true"));
+                            } else if line.contains("IPv6-Addrs: ") {
+                                ips = Some(
+                                    line.replace("IPv6-Addrs: ", "")
+                                        .split(" ")
+                                        .map(|s| s.to_string())
+                                        .collect(),
+                                );
+                            } else if line.contains("IPv6-Port: ") {
+                                port = line.replace("IPv6-Port: ", "").parse::<u16>().ok();
+                            } else if line.contains("IPv4Internal-Addrs: ") && ips.is_none() {
+                                ips = Some(
+                                    line.replace("IPv4Internal-Addrs: ", "")
+                                        .split(" ")
+                                        .map(|s| s.to_string())
+                                        .collect(),
+                                );
+                            } else if line.contains("IPv4Internal-Port: ") && port.is_none() {
+                                port = line.replace("IPv4Internal-Port: ", "").parse::<u16>().ok();
+                            }
+                        }
+
+                        if let Some(bridge) = bridge
+                            && let Some(listening) = listening
+                            && let Some(ips) = ips
+                            && let Some(port) = port
+                        {
+                            return InternalEvent::P2pDirectConnectionOk {
+                                destination,
+                                message: binary_payload,
+                                bridge,
+                                listening,
+                                ips,
+                                port,
+                            };
+                        }
+                    }
+
+                    return InternalEvent::P2pOk {
+                        destination,
+                        message: binary_payload,
                     };
                 }
 

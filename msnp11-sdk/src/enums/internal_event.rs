@@ -24,6 +24,20 @@ pub(crate) enum InternalEvent {
         message: Vec<u8>,
     },
 
+    P2pOk {
+        destination: String,
+        message: Vec<u8>,
+    },
+
+    P2pDirectConnectionOk {
+        destination: String,
+        message: Vec<u8>,
+        bridge: String,
+        listening: bool,
+        ips: Vec<String>,
+        port: u16,
+    },
+
     P2pData {
         destination: String,
         message: Vec<u8>,

@@ -51,7 +51,7 @@ pub async fn handle_invite(
         .replace("From: <msnmsgr:", "")
         .replace(">", "");
 
-    let session = P2pSession::new_from_invite(&invite)?;
+    let mut session = P2pSession::new_from_invite(&invite)?;
     let ack_payload = P2pSession::acknowledge(&invite)?;
 
     msg::send_p2p(

@@ -1,9 +1,12 @@
 use crate::errors::p2p_error::P2pError;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
+#[cfg(feature = "file-transfers")]
 use crate::switchboard_server::p2p::file_context::FileContext;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::{DekuContainerRead, DekuContainerWrite};
+#[cfg(feature = "file-transfers")]
+use getifs::interface_addrs;
 use rand::Rng;
 use rand::rng;
 use std::error::Error;
@@ -11,7 +14,7 @@ use std::io::Cursor;
 
 pub struct P2pSession {
     session_id: u32,
-    base_identifier: u32,
+    identifier: u32,
     branch: String,
     call_id: String,
 }
@@ -20,7 +23,7 @@ impl P2pSession {
     pub fn new() -> Self {
         Self {
             session_id: 0,
-            base_identifier: rng().next_u32(),
+            identifier: rng().next_u32(),
             branch: "".to_string(),
             call_id: "".to_string(),
         }
@@ -50,7 +53,7 @@ impl P2pSession {
         let session_id = session_id.replace("SessionID: ", "").parse::<u32>()?;
         Ok(Self {
             session_id,
-            base_identifier: rng().next_u32(),
+            identifier: rng().next_u32(),
             branch,
             call_id,
         })
@@ -73,9 +76,16 @@ impl P2pSession {
             .as_str(),
         );
 
-        self.invite(to, from, &body)
+        self.invite(
+            to,
+            from,
+            &body,
+            guid_create::GUID::rand().to_string(),
+            "application/x-msnmsgr-sessionreqbody",
+        )
     }
 
+    #[cfg(feature = "file-transfers")]
     pub fn file_invite(
         &mut self,
         to: &str,
@@ -111,32 +121,74 @@ impl P2pSession {
         body.push_str("AppID: 2\r\n");
         body.push_str(format!("Context: {}\r\n\r\n\0", STANDARD.encode(context)).as_str());
 
-        self.invite(to, from, &body)
+        self.invite(
+            to,
+            from,
+            &body,
+            guid_create::GUID::rand().to_string(),
+            "application/x-msnmsgr-sessionreqbody",
+        )
     }
 
-    fn invite(&mut self, to: &str, from: &str, body: &str) -> Result<Vec<u8>, P2pError> {
-        let branch = guid_create::GUID::rand().to_string();
-        let call_id = guid_create::GUID::rand().to_string();
+    #[cfg(feature = "file-transfers")]
+    pub fn direct_connection_invite(&mut self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
+        let mut body = "Bridges: TCPv1\r\n".to_string();
+        body.push_str("NetID: 0\r\n");
+        body.push_str("Conn-Type: Firewall\r\n");
+        body.push_str("UPnPNat: false\r\n");
+        body.push_str("ICF: false\r\n");
 
+        let ips = interface_addrs().or(Err(P2pError::CouldNotGetIpAddress))?;
+        let ip = ips.first().ok_or(P2pError::CouldNotGetIpAddress)?;
+
+        if ip.addr().is_ipv6() {
+            body.push_str(&format!("IPv6-global: {}\r\n", ip.addr()));
+        }
+
+        body.push_str(&format!(
+            "Hashed-Nonce: {{{}}}\r\n\r\n\0",
+            &guid_create::GUID::rand().to_string()
+        ));
+
+        self.invite(
+            to,
+            from,
+            &body,
+            self.call_id.clone(),
+            "application/x-msnmsgr-transreqbody",
+        )
+    }
+
+    fn invite(
+        &mut self,
+        to: &str,
+        from: &str,
+        body: &str,
+        call_id: String,
+        content_type: &str,
+    ) -> Result<Vec<u8>, P2pError> {
+        let branch = guid_create::GUID::rand().to_string();
         let mut headers = format!("INVITE MSNMSGR:{to} MSNSLP/1.0\r\n");
         headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());
         headers.push_str(format!("From: <msnmsgr:{from}>\r\n").as_str());
         headers.push_str(format!("Via: MSNSLP/1.0/TLP ;branch={{{branch}}}\r\n").as_str());
-        headers.push_str("CSeq: 0\r\n");
+        headers.push_str("CSeq: 0 \r\n");
         headers.push_str(format!("Call-ID: {{{call_id}}}\r\n").as_str());
         headers.push_str("Max-Forwards: 0\r\n");
-        headers.push_str("Content-Type: application/x-msnmsgr-sessionreqbody\r\n");
+        headers.push_str(&format!("Content-Type: {content_type}\r\n"));
         headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
         let message = format!("{headers}{body}");
+        self.identifier += 1;
+
         let mut invite = BinaryHeader {
             session_id: 0,
-            identifier: self.base_identifier,
+            identifier: self.identifier,
             data_offset: 0,
             total_data_size: message.len() as u64,
             length: message.len() as u32,
             flag: 0x00,
-            ack_identifier: self.base_identifier + 1,
+            ack_identifier: rng().next_u32(),
             ack_unique_id: 0,
             ack_data_size: 0,
         }
@@ -167,9 +219,9 @@ impl P2pSession {
             total_data_size: binary_header.total_data_size,
             length: 0,
             flag: 0x02,
-            ack_identifier: binary_header.identifier + 1,
-            ack_unique_id: binary_header.ack_unique_id,
-            ack_data_size: binary_header.ack_data_size,
+            ack_identifier: binary_header.identifier,
+            ack_unique_id: binary_header.ack_identifier,
+            ack_data_size: binary_header.total_data_size,
         }
         .to_bytes()
         .or(Err(P2pError::BinaryHeaderReadingError))?;
@@ -178,7 +230,7 @@ impl P2pSession {
         Ok(ack_header)
     }
 
-    pub fn ok(&self, to: &str, from: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    pub fn ok(&mut self, to: &str, from: &str) -> Result<Vec<u8>, Box<dyn Error>> {
         let mut body = "EUF-GUID: {A4268EEC-FEC5-49E5-95C3-F126696BDBF6}\r\n".to_string();
         body.push_str(format!("SessionID: {}\r\n\r\n\0", self.session_id).as_str());
 
@@ -193,14 +245,16 @@ impl P2pSession {
         headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
         let message = format!("{headers}{body}");
+        self.identifier += 1;
+
         let mut ok = BinaryHeader {
             session_id: 0,
-            identifier: self.base_identifier + 1,
+            identifier: self.identifier,
             data_offset: 0,
             total_data_size: message.len() as u64,
             length: message.len() as u32,
             flag: 0x00,
-            ack_identifier: self.base_identifier + 1,
+            ack_identifier: rng().next_u32(),
             ack_unique_id: 0,
             ack_data_size: 0,
         }
@@ -211,7 +265,7 @@ impl P2pSession {
         Ok(ok)
     }
 
-    pub fn decline(&self, to: &str, from: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    pub fn decline(&mut self, to: &str, from: &str) -> Result<Vec<u8>, Box<dyn Error>> {
         let body = format!("SessionID: {}\r\n\r\n\0", self.session_id);
 
         let mut headers = "MSNSLP/1.0 603 Decline\r\n".to_string();
@@ -225,14 +279,16 @@ impl P2pSession {
         headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
         let message = format!("{headers}{body}");
+        self.identifier += 1;
+
         let mut decline = BinaryHeader {
             session_id: 0,
-            identifier: self.base_identifier + 1,
+            identifier: self.identifier,
             data_offset: 0,
             total_data_size: message.len() as u64,
             length: message.len() as u32,
             flag: 0x00,
-            ack_identifier: self.base_identifier + 1,
+            ack_identifier: rng().next_u32(),
             ack_unique_id: 0,
             ack_data_size: 0,
         }
@@ -243,16 +299,18 @@ impl P2pSession {
         Ok(decline)
     }
 
-    pub fn data_preparation(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+    pub fn data_preparation(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
         let message = &[0; 4];
+        self.identifier += 1;
+
         let mut data_preparation = BinaryHeader {
             session_id: self.session_id,
-            identifier: self.base_identifier + 2,
+            identifier: self.identifier,
             data_offset: 0,
             total_data_size: message.len() as u64,
             length: message.len() as u32,
             flag: 0x00,
-            ack_identifier: self.base_identifier + 2,
+            ack_identifier: rng().next_u32(),
             ack_unique_id: 0,
             ack_data_size: 0,
         }
@@ -263,21 +321,22 @@ impl P2pSession {
         Ok(data_preparation)
     }
 
-    pub fn data(&self, data: &[u8]) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
+    pub fn data(&mut self, data: &[u8]) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
         let mut payloads: Vec<Vec<u8>> = Vec::new();
         let total_data_size = data.len() as u64;
         let mut data_offset = 0u64;
+        self.identifier += 1;
 
         let chunks = data.chunks(1202);
         for chunk in chunks {
             let mut data_message = BinaryHeader {
                 session_id: self.session_id,
-                identifier: self.base_identifier + 3,
+                identifier: self.identifier,
                 data_offset,
                 total_data_size,
                 length: chunk.len() as u32,
                 flag: 0x20,
-                ack_identifier: self.base_identifier + 3,
+                ack_identifier: rng().next_u32(),
                 ack_unique_id: 0,
                 ack_data_size: 0,
             }
@@ -293,7 +352,7 @@ impl P2pSession {
         Ok(payloads)
     }
 
-    pub fn bye(&self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
+    pub fn bye(&mut self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
         let body = "\r\n\0";
 
         let mut headers = format!("BYE MSNMSGR:{to} MSNSLP/1.0\r\n");
@@ -307,14 +366,16 @@ impl P2pSession {
         headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
         let message = format!("{headers}{body}");
+        self.identifier += 1;
+
         let mut bye = BinaryHeader {
             session_id: 0,
-            identifier: self.base_identifier + 4,
+            identifier: self.identifier,
             data_offset: 0,
             total_data_size: message.len() as u64,
             length: message.len() as u32,
             flag: 0x00,
-            ack_identifier: self.base_identifier + 4,
+            ack_identifier: rng().next_u32(),
             ack_unique_id: 0,
             ack_data_size: 0,
         }

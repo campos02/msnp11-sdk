@@ -375,7 +375,7 @@ impl Switchboard {
                         .replace("From: <msnmsgr:", "")
                         .replace(">", "");
 
-                    let session =
+                    let mut session =
                         P2pSession::new_from_invite(&invite).or(Err(P2pError::InviteError))?;
 
                     let decline = session
@@ -444,6 +444,146 @@ impl Switchboard {
             .or(Err(P2pError::TransmittingError))?;
 
         Ok(())
+    }
+
+    #[cfg(feature = "file-transfers")]
+    pub async fn send_file(&self, email: &str) -> Result<(), P2pError> {
+        let mut session = P2pSession::new();
+        let mut internal_rx = self.internal_tx.subscribe();
+
+        let invite;
+        {
+            let user_data = self.user_data.read().await;
+            let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
+            invite = session.file_invite(email, user_email, "block.svg", 5085)?
+        }
+
+        {
+            let mut internal_rx = self.internal_tx.subscribe();
+            msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, invite, email).await?;
+        }
+
+        loop {
+            match internal_rx.recv().await.or(Err(P2pError::ReceivingError))? {
+                InternalEvent::P2pShouldAck {
+                    destination,
+                    message,
+                } => {
+                    {
+                        let user_data = self.user_data.read().await;
+                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
+
+                        if destination != *user_email {
+                            continue;
+                        }
+                    }
+
+                    let mut internal_rx = self.internal_tx.subscribe();
+                    let ack = P2pSession::acknowledge(&message)?;
+                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
+                }
+
+                InternalEvent::P2pOk {
+                    destination,
+                    message,
+                } => {
+                    {
+                        let user_data = self.user_data.read().await;
+                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
+
+                        if destination != *user_email {
+                            continue;
+                        }
+                    }
+
+                    let mut internal_rx = self.internal_tx.subscribe();
+                    let ack = P2pSession::acknowledge(&message)?;
+                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
+
+                    let invite;
+                    {
+                        let user_data = self.user_data.read().await;
+                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
+                        invite = session.direct_connection_invite(email, user_email)?;
+                    }
+
+                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, invite, email)
+                        .await?;
+                }
+
+                InternalEvent::P2pDirectConnectionOk {
+                    destination,
+                    message,
+                    bridge,
+                    listening,
+                    ips,
+                    port,
+                } => {
+                    {
+                        let user_data = self.user_data.read().await;
+                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
+
+                        if destination != *user_email {
+                            continue;
+                        }
+                    }
+
+                    let mut internal_rx = self.internal_tx.subscribe();
+                    let ack = P2pSession::acknowledge(&message)?;
+                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
+
+                    todo!(); // Connect via TCP
+                }
+
+                InternalEvent::P2pInvite {
+                    destination,
+                    message: invite,
+                } => {
+                    {
+                        let user_data = self.user_data.read().await;
+                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
+
+                        if destination != *user_email {
+                            continue;
+                        }
+                    }
+
+                    let mut internal_rx = self.internal_tx.subscribe();
+                    let invite_string = unsafe { str::from_utf8_unchecked(invite.as_slice()) };
+                    let mut invite_parameters = invite_string.lines();
+
+                    invite_parameters.next();
+                    let to = invite_parameters.next().ok_or(P2pError::InviteError)?;
+
+                    {
+                        let user_data = self.user_data.read().await;
+                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
+
+                        if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
+                            continue;
+                        }
+                    }
+
+                    let from = invite_parameters
+                        .next()
+                        .ok_or(P2pError::InviteError)?
+                        .replace("From: <msnmsgr:", "")
+                        .replace(">", "");
+
+                    let mut session =
+                        P2pSession::new_from_invite(&invite).or(Err(P2pError::InviteError))?;
+
+                    let decline = session
+                        .decline(from.as_str(), to)
+                        .or(Err(P2pError::InviteError))?;
+
+                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, decline, email)
+                        .await?;
+                }
+
+                _ => (),
+            }
+        }
     }
 
     /// Disconnects from the Switchboard.
