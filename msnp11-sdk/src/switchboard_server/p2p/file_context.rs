@@ -7,6 +7,6 @@ pub struct FileContext {
     pub second_field: u32,
     pub file_size: u64,
     pub preview: u32,
-    #[deku(count = "554")]
+    #[deku(count = "size - 20")]
     pub file_name: Vec<u8>,
 }
