@@ -12,6 +12,8 @@ pub enum P2pError {
     OtherContext,
     #[error("Could not read binary header from P2P message")]
     BinaryHeaderReadingError,
+    #[error("Could not create binary header")]
+    BinaryHeaderWritingError,
     #[error("Message could not be delivered to all recipients")]
     MessageNotDelivered,
     #[error("Please log in before using this command")]
@@ -28,4 +30,8 @@ pub enum P2pError {
     CouldNotGetDisplayPicture,
     #[error("Could not get device IP address")]
     CouldNotGetIpAddress,
+    #[error("Could not send through a direct connection")]
+    CouldNotSendThroughDirectConnection,
+    #[error("Could not send file")]
+    CouldNotSendFile,
 }

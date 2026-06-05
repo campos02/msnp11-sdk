@@ -10,7 +10,6 @@ use crate::models::user_data::UserData;
 use crate::receive_split::receive_split;
 use crate::switchboard_server::commands::{ans, cal, msg, usr};
 use crate::switchboard_server::event_matcher::{into_event, into_internal_event};
-use crate::switchboard_server::p2p;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 use crate::switchboard_server::p2p::p2p_session::P2pSession;
 use core::str;
@@ -153,7 +152,7 @@ impl Switchboard {
                                     destination,
                                     message: invite,
                                 } => {
-                                    let _ = p2p::send_display_picture::handle_invite(
+                                    let _ = P2pSession::handle_display_picture_invite(
                                         destination,
                                         invite,
                                         user_data.clone(),
@@ -168,7 +167,7 @@ impl Switchboard {
                                     destination,
                                     message: bye,
                                 } => {
-                                    let _ = p2p::send_display_picture::handle_bye(
+                                    let _ = P2pSession::handle_display_picture_bye(
                                         destination,
                                         bye,
                                         user_data.clone(),
@@ -447,7 +446,12 @@ impl Switchboard {
     }
 
     #[cfg(feature = "file-transfers")]
-    pub async fn send_file(&self, email: &str) -> Result<(), P2pError> {
+    pub async fn send_file(
+        &self,
+        email: &str,
+        file_name: &str,
+        file: &[u8],
+    ) -> Result<(), P2pError> {
         let mut session = P2pSession::new();
         let mut internal_rx = self.internal_tx.subscribe();
 
@@ -455,7 +459,7 @@ impl Switchboard {
         {
             let user_data = self.user_data.read().await;
             let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-            invite = session.file_invite(email, user_email, "block.svg", 5085)?
+            invite = session.file_invite(email, user_email, file_name, file.len() as u64)?
         }
 
         {
@@ -516,6 +520,7 @@ impl Switchboard {
                     message,
                     bridge,
                     listening,
+                    nonce,
                     ips,
                     port,
                 } => {
@@ -532,7 +537,27 @@ impl Switchboard {
                     let ack = P2pSession::acknowledge(&message)?;
                     msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
 
-                    todo!(); // Connect via TCP
+                    if listening && bridge == "TCPv1" {
+                        if session
+                            .direct_connection_send_file(&*ips, port, &nonce, file)
+                            .await
+                            .is_err()
+                        {
+                            let data_payloads =
+                                session.data(file).or(Err(P2pError::CouldNotSendFile))?;
+
+                            for data_payload in data_payloads {
+                                msg::send_p2p(
+                                    &self.tr_id,
+                                    &self.sb_tx,
+                                    &mut internal_rx,
+                                    data_payload,
+                                    email,
+                                )
+                                .await?;
+                            }
+                        }
+                    }
                 }
 
                 InternalEvent::P2pInvite {

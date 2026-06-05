@@ -32,7 +32,7 @@ uniffi = { version = "0.31.0", features = [ "build" ], optional = true }
 [features]
 config = []
 file-transfers = ["dep:getifs"]
-uniffi = ["config", "dep:uniffi", "dep:async-trait"]
+uniffi = ["config", "file-transfers", "dep:uniffi", "dep:async-trait"]
 
 [lib]
 crate-type = ["cdylib", "staticlib", "lib"]

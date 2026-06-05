@@ -34,6 +34,7 @@ pub(crate) enum InternalEvent {
         message: Vec<u8>,
         bridge: String,
         listening: bool,
+        nonce: guid_create::GUID,
         ips: Vec<String>,
         port: u16,
     },

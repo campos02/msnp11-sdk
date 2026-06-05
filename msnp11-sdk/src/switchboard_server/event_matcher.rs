@@ -119,6 +119,7 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
 
                         let mut bridge = None;
                         let mut listening = None;
+                        let mut nonce = None;
                         let mut ips = None;
                         let mut port = None;
 
@@ -127,6 +128,8 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                                 bridge = Some(line.replace("Bridge: ", ""));
                             } else if line.contains("Listening: ") {
                                 listening = Some(line.contains("true"));
+                            } else if line.contains("Nonce: ") {
+                                nonce = Some(line.replace("Nonce: {", "").replace("}", ""));
                             } else if line.contains("IPv6-Addrs: ") {
                                 ips = Some(
                                     line.replace("IPv6-Addrs: ", "")
@@ -150,6 +153,8 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
 
                         if let Some(bridge) = bridge
                             && let Some(listening) = listening
+                            && let Some(nonce) = nonce
+                            && let Ok(nonce) = guid_create::GUID::parse(&nonce)
                             && let Some(ips) = ips
                             && let Some(port) = port
                         {
@@ -158,6 +163,7 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                                 message: binary_payload,
                                 bridge,
                                 listening,
+                                nonce,
                                 ips,
                                 port,
                             };

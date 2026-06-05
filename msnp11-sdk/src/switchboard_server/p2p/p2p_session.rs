@@ -1,7 +1,10 @@
+use crate::enums::internal_event::InternalEvent;
 use crate::errors::p2p_error::P2pError;
+use crate::models::user_data::UserData;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 #[cfg(feature = "file-transfers")]
 use crate::switchboard_server::p2p::file_context::FileContext;
+use crate::switchboard_server::p2p::{direct_connection, send_display_picture};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::{DekuContainerRead, DekuContainerWrite};
@@ -11,12 +14,17 @@ use rand::Rng;
 use rand::rng;
 use std::error::Error;
 use std::io::Cursor;
+use std::sync::Arc;
+use std::sync::atomic::AtomicU32;
+use tokio::sync::RwLock;
+use tokio::sync::broadcast::Receiver;
+use tokio::sync::mpsc::Sender;
 
 pub struct P2pSession {
     session_id: u32,
     identifier: u32,
-    branch: String,
-    call_id: String,
+    branch: guid_create::GUID,
+    call_id: guid_create::GUID,
 }
 
 impl P2pSession {
@@ -24,8 +32,8 @@ impl P2pSession {
         Self {
             session_id: 0,
             identifier: rng().next_u32(),
-            branch: "".to_string(),
-            call_id: "".to_string(),
+            branch: guid_create::GUID::default(),
+            call_id: guid_create::GUID::default(),
         }
     }
 
@@ -37,15 +45,24 @@ impl P2pSession {
             return Err(P2pError::P2pInvite.into());
         };
 
-        let branch = branch
-            .replace("Via: MSNSLP/1.0/TLP ;branch={", "")
-            .replace("}", "");
+        let Ok(branch) = guid_create::GUID::parse(
+            &*branch
+                .replace("Via: MSNSLP/1.0/TLP ;branch={", "")
+                .replace("}", ""),
+        ) else {
+            return Err(P2pError::P2pInvite.into());
+        };
 
         let Some(call_id) = invite.find(|parameter| parameter.starts_with("Call-ID: {")) else {
             return Err(P2pError::P2pInvite.into());
         };
 
-        let call_id = call_id.replace("Call-ID: {", "").replace("}", "");
+        let Ok(call_id) =
+            guid_create::GUID::parse(&*call_id.replace("Call-ID: {", "").replace("}", ""))
+        else {
+            return Err(P2pError::P2pInvite.into());
+        };
+
         let Some(session_id) = invite.find(|parameter| parameter.starts_with("SessionID: ")) else {
             return Err(P2pError::P2pInvite.into());
         };
@@ -57,6 +74,44 @@ impl P2pSession {
             branch,
             call_id,
         })
+    }
+
+    pub async fn handle_display_picture_invite(
+        destination: String,
+        invite: Vec<u8>,
+        user_data: Arc<RwLock<UserData>>,
+        command_internal_rx: &mut Receiver<InternalEvent>,
+        tr_id: Arc<AtomicU32>,
+        sb_tx: Sender<Vec<u8>>,
+    ) -> Result<(), Box<dyn Error>> {
+        send_display_picture::handle_invite(
+            destination,
+            invite,
+            user_data,
+            command_internal_rx,
+            tr_id,
+            sb_tx,
+        )
+        .await
+    }
+
+    pub async fn handle_display_picture_bye(
+        destination: String,
+        bye: Vec<u8>,
+        user_data: Arc<RwLock<UserData>>,
+        command_internal_rx: &mut Receiver<InternalEvent>,
+        tr_id: Arc<AtomicU32>,
+        sb_tx: Sender<Vec<u8>>,
+    ) -> Result<(), Box<dyn Error>> {
+        send_display_picture::handle_bye(
+            destination,
+            bye,
+            user_data,
+            command_internal_rx,
+            tr_id,
+            sb_tx,
+        )
+        .await
     }
 
     pub fn picture_invite(
@@ -80,7 +135,7 @@ impl P2pSession {
             to,
             from,
             &body,
-            guid_create::GUID::rand().to_string(),
+            guid_create::GUID::rand(),
             "application/x-msnmsgr-sessionreqbody",
         )
     }
@@ -125,7 +180,7 @@ impl P2pSession {
             to,
             from,
             &body,
-            guid_create::GUID::rand().to_string(),
+            guid_create::GUID::rand(),
             "application/x-msnmsgr-sessionreqbody",
         )
     }
@@ -145,10 +200,8 @@ impl P2pSession {
             body.push_str(&format!("IPv6-global: {}\r\n", ip.addr()));
         }
 
-        body.push_str(&format!(
-            "Hashed-Nonce: {{{}}}\r\n\r\n\0",
-            &guid_create::GUID::rand().to_string()
-        ));
+        let nonce = guid_create::GUID::rand();
+        body.push_str(&format!("Nonce: {{{}}}\r\n\r\n\0", &nonce));
 
         self.invite(
             to,
@@ -164,10 +217,10 @@ impl P2pSession {
         to: &str,
         from: &str,
         body: &str,
-        call_id: String,
+        call_id: guid_create::GUID,
         content_type: &str,
     ) -> Result<Vec<u8>, P2pError> {
-        let branch = guid_create::GUID::rand().to_string();
+        let branch = guid_create::GUID::rand();
         let mut headers = format!("INVITE MSNMSGR:{to} MSNSLP/1.0\r\n");
         headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());
         headers.push_str(format!("From: <msnmsgr:{from}>\r\n").as_str());
@@ -385,5 +438,23 @@ impl P2pSession {
         bye.extend_from_slice(message.as_bytes());
         bye.extend_from_slice(&[0; 4]);
         Ok(bye)
+    }
+
+    pub async fn direct_connection_send_file(
+        &mut self,
+        ips: &[String],
+        port: u16,
+        nonce: &guid_create::GUID,
+        file: &[u8],
+    ) -> Result<(), P2pError> {
+        direct_connection::send_file(
+            ips,
+            port,
+            nonce,
+            self.session_id,
+            &mut self.identifier,
+            file,
+        )
+        .await
     }
 }
