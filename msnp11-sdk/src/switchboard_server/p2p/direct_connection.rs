@@ -1,7 +1,7 @@
 use crate::P2pError;
 use crate::P2pError::BinaryHeaderWritingError;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
-use crate::switchboard_server::p2p::p2p_session::P2pSession;
+use crate::switchboard_server::p2p::bye;
 use deku::DekuContainerWrite;
 use rand::{Rng, rng};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -13,6 +13,10 @@ pub async fn send_file(
     nonce: &guid_create::GUID,
     session_id: u32,
     identifier: &mut u32,
+    branch: &guid_create::GUID,
+    call_id: &guid_create::GUID,
+    to: &str,
+    from: &str,
     file: &[u8],
 ) -> Result<(), P2pError> {
     for ip in ips {
@@ -139,40 +143,11 @@ pub async fn send_file(
                         message.extend_from_slice(&buf);
                     }
 
-                    // Receive BYE length
-                    let mut message = Vec::with_capacity(4);
-                    while message.len() < 4 {
-                        let mut buf = vec![0; 4 - message.len()];
-                        let received = socket.read(&mut buf).await.unwrap_or_default();
-
-                        if received == 0 {
-                            break;
-                        }
-
-                        message.extend_from_slice(&buf);
-                    }
-
-                    // Receive BYE
-                    let bye_length = u32::from_le_bytes(message.try_into().unwrap_or_default());
-                    let mut message = Vec::with_capacity(4);
-
-                    while message.len() < bye_length as usize {
-                        let mut buf = vec![0; bye_length as usize - message.len()];
-                        let received = socket.read(&mut buf).await.unwrap_or_default();
-
-                        if received == 0 {
-                            break;
-                        }
-
-                        message.extend_from_slice(&buf);
-                    }
-
-                    let message_string = unsafe { str::from_utf8_unchecked(message.as_slice()) };
-                    if message_string.contains("BYE") {
-                        let ack = P2pSession::acknowledge(&message)?;
-                        let _ = socket.write_all(&u32::to_le_bytes(48)).await;
-                        let _ = socket.write_all(&ack).await;
-                        todo!() // Return event
+                    if let Ok(mut bye) = bye::bye(to, from, branch, call_id, identifier) {
+                        bye.truncate(bye.len() - 4);
+                        let _ = socket.write_all(&u32::to_le_bytes(bye.len() as u32)).await;
+                        let _ = socket.write_all(&bye).await;
+                        return Ok(());
                     }
                 }
             }

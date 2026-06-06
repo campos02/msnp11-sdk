@@ -1,4 +1,5 @@
 pub mod binary_header;
+mod bye;
 #[cfg(feature = "file-transfers")]
 mod direct_connection;
 #[cfg(feature = "file-transfers")]

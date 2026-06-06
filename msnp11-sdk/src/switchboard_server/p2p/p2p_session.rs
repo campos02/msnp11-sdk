@@ -4,7 +4,7 @@ use crate::models::user_data::UserData;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 #[cfg(feature = "file-transfers")]
 use crate::switchboard_server::p2p::file_context::FileContext;
-use crate::switchboard_server::p2p::{direct_connection, send_display_picture};
+use crate::switchboard_server::p2p::{bye, direct_connection, send_display_picture};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::{DekuContainerRead, DekuContainerWrite};
@@ -120,8 +120,9 @@ impl P2pSession {
         from: &str,
         msn_object: &str,
     ) -> Result<Vec<u8>, P2pError> {
+        self.session_id = rng().next_u32();
         let mut body = "EUF-GUID: {A4268EEC-FEC5-49E5-95C3-F126696BDBF6}\r\n".to_string();
-        body.push_str(format!("SessionID: {}\r\n", rng().next_u32()).as_str());
+        body.push_str(format!("SessionID: {}\r\n", self.session_id).as_str());
         body.push_str("AppID: 1\r\n");
         body.push_str(
             format!(
@@ -171,8 +172,9 @@ impl P2pSession {
         .to_bytes()
         .or(Err(P2pError::InviteError))?;
 
+        self.session_id = rng().next_u32();
         let mut body = "EUF-GUID: {5D3E02AB-6190-11D3-BBBB-00C04F795683}\r\n".to_string();
-        body.push_str(format!("SessionID: {}\r\n", rng().next_u32()).as_str());
+        body.push_str(format!("SessionID: {}\r\n", self.session_id).as_str());
         body.push_str("AppID: 2\r\n");
         body.push_str(format!("Context: {}\r\n\r\n\0", STANDARD.encode(context)).as_str());
 
@@ -406,38 +408,7 @@ impl P2pSession {
     }
 
     pub fn bye(&mut self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
-        let body = "\r\n\0";
-
-        let mut headers = format!("BYE MSNMSGR:{to} MSNSLP/1.0\r\n");
-        headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());
-        headers.push_str(format!("From: <msnmsgr:{from}>\r\n").as_str());
-        headers.push_str(format!("Via: MSNSLP/1.0/TLP ;branch={{{}}}\r\n", self.branch).as_str());
-        headers.push_str("CSeq: 0\r\n");
-        headers.push_str(format!("Call-ID: {{{}}}\r\n", self.call_id).as_str());
-        headers.push_str("Max-Forwards: 0\r\n");
-        headers.push_str("Content-Type: application/x-msnmsgr-sessionreqbody\r\n");
-        headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
-
-        let message = format!("{headers}{body}");
-        self.identifier += 1;
-
-        let mut bye = BinaryHeader {
-            session_id: 0,
-            identifier: self.identifier,
-            data_offset: 0,
-            total_data_size: message.len() as u64,
-            length: message.len() as u32,
-            flag: 0x00,
-            ack_identifier: rng().next_u32(),
-            ack_unique_id: 0,
-            ack_data_size: 0,
-        }
-        .to_bytes()
-        .or(Err(P2pError::BinaryHeaderReadingError))?;
-
-        bye.extend_from_slice(message.as_bytes());
-        bye.extend_from_slice(&[0; 4]);
-        Ok(bye)
+        bye::bye(to, from, &self.branch, &self.call_id, &mut self.identifier)
     }
 
     pub async fn direct_connection_send_file(
@@ -445,6 +416,8 @@ impl P2pSession {
         ips: &[String],
         port: u16,
         nonce: &guid_create::GUID,
+        to: &str,
+        from: &str,
         file: &[u8],
     ) -> Result<(), P2pError> {
         direct_connection::send_file(
@@ -453,6 +426,10 @@ impl P2pSession {
             nonce,
             self.session_id,
             &mut self.identifier,
+            &self.branch,
+            &self.call_id,
+            to,
+            from,
             file,
         )
         .await

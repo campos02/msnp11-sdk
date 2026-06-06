@@ -524,13 +524,14 @@ impl Switchboard {
                     ips,
                     port,
                 } => {
+                    let user_email;
                     {
                         let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
+                        user_email = user_data.email.clone().ok_or(P2pError::NotLoggedIn)?;
+                    }
 
-                        if destination != *user_email {
-                            continue;
-                        }
+                    if destination != user_email {
+                        continue;
                     }
 
                     let mut internal_rx = self.internal_tx.subscribe();
@@ -539,7 +540,14 @@ impl Switchboard {
 
                     if listening && bridge == "TCPv1" {
                         if session
-                            .direct_connection_send_file(&*ips, port, &nonce, file)
+                            .direct_connection_send_file(
+                                &*ips,
+                                port,
+                                &nonce,
+                                email,
+                                &user_email,
+                                file,
+                            )
                             .await
                             .is_err()
                         {
@@ -556,7 +564,13 @@ impl Switchboard {
                                 )
                                 .await?;
                             }
+
+                            let bye = session.bye(email, &user_email)?;
+                            msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, bye, email)
+                                .await?;
                         }
+
+                        break;
                     }
                 }
 
@@ -609,6 +623,8 @@ impl Switchboard {
                 _ => (),
             }
         }
+
+        Ok(())
     }
 
     /// Disconnects from the Switchboard.
