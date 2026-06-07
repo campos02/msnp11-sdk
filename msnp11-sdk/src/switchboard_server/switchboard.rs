@@ -491,8 +491,10 @@ impl Switchboard {
                     let ack = P2pSession::acknowledge(&message)?;
                     msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
 
-                    if listening && bridge == "TCPv1" {
-                        if session
+                    // Use direct connection if possible or fall back to sending through Switchboard
+                    if !listening
+                        || bridge != "TCPv1"
+                        || session
                             .direct_connection_send_file(
                                 &ips,
                                 port,
@@ -503,29 +505,28 @@ impl Switchboard {
                             )
                             .await
                             .is_err()
-                        {
-                            let data_payloads = session
-                                .data(file, true)
-                                .or(Err(P2pError::CouldNotSendFile))?;
+                    {
+                        let data_payloads = session
+                            .data(file, true)
+                            .or(Err(P2pError::CouldNotSendFile))?;
 
-                            for data_payload in data_payloads {
-                                msg::send_p2p(
-                                    &self.tr_id,
-                                    &self.sb_tx,
-                                    &mut internal_rx,
-                                    data_payload,
-                                    email,
-                                )
-                                .await?;
-                            }
-
-                            let bye = session.bye(email, &user_email)?;
-                            msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, bye, email)
-                                .await?;
+                        for data_payload in data_payloads {
+                            msg::send_p2p(
+                                &self.tr_id,
+                                &self.sb_tx,
+                                &mut internal_rx,
+                                data_payload,
+                                email,
+                            )
+                            .await?;
                         }
 
-                        break;
+                        let bye = session.bye(email, &user_email)?;
+                        msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, bye, email)
+                            .await?;
                     }
+
+                    break;
                 }
 
                 InternalEvent::P2pInvite {
