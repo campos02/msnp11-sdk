@@ -1,10 +1,12 @@
+#[cfg(feature = "file-transfers")]
+use crate::P2pError::BinaryHeaderWritingError;
 use crate::enums::internal_event::InternalEvent;
 use crate::errors::p2p_error::P2pError;
 use crate::models::user_data::UserData;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 #[cfg(feature = "file-transfers")]
 use crate::switchboard_server::p2p::file_context::FileContext;
-use crate::switchboard_server::p2p::{bye, direct_connection, send_display_picture};
+use crate::switchboard_server::p2p::send_display_picture;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::{DekuContainerRead, DekuContainerWrite};
@@ -16,6 +18,8 @@ use std::error::Error;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU32;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tokio::sync::RwLock;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::Sender;
@@ -39,33 +43,26 @@ impl P2pSession {
 
     pub fn new_from_invite(invite: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
         let mut invite = unsafe { str::from_utf8_unchecked(invite.as_slice()) }.split("\r\n");
-        let Some(branch) =
-            invite.find(|parameter| parameter.starts_with("Via: MSNSLP/1.0/TLP ;branch={"))
-        else {
-            return Err(P2pError::P2pInvite.into());
-        };
+        let branch = invite
+            .find(|parameter| parameter.starts_with("Via: MSNSLP/1.0/TLP ;branch={"))
+            .ok_or(P2pError::P2pInvite)?;
 
-        let Ok(branch) = guid_create::GUID::parse(
+        let branch = guid_create::GUID::parse(
             &branch
                 .replace("Via: MSNSLP/1.0/TLP ;branch={", "")
                 .replace("}", ""),
-        ) else {
-            return Err(P2pError::P2pInvite.into());
-        };
+        )?;
 
-        let Some(call_id) = invite.find(|parameter| parameter.starts_with("Call-ID: {")) else {
-            return Err(P2pError::P2pInvite.into());
-        };
+        let call_id = invite
+            .find(|parameter| parameter.starts_with("Call-ID: {"))
+            .ok_or(P2pError::P2pInvite)?;
 
-        let Ok(call_id) =
-            guid_create::GUID::parse(&call_id.replace("Call-ID: {", "").replace("}", ""))
-        else {
-            return Err(P2pError::P2pInvite.into());
-        };
+        let call_id =
+            guid_create::GUID::parse(&call_id.replace("Call-ID: {", "").replace("}", ""))?;
 
-        let Some(session_id) = invite.find(|parameter| parameter.starts_with("SessionID: ")) else {
-            return Err(P2pError::P2pInvite.into());
-        };
+        let session_id = invite
+            .find(|parameter| parameter.starts_with("SessionID: "))
+            .ok_or(P2pError::P2pInvite)?;
 
         let session_id = session_id.replace("SessionID: ", "").parse::<u32>()?;
         Ok(Self {
@@ -412,9 +409,41 @@ impl P2pSession {
     }
 
     pub fn bye(&mut self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
-        bye::bye(to, from, &self.branch, &self.call_id, &mut self.identifier)
+        let body = "\r\n\0";
+
+        let mut headers = format!("BYE MSNMSGR:{to} MSNSLP/1.0\r\n");
+        headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());
+        headers.push_str(format!("From: <msnmsgr:{from}>\r\n").as_str());
+        headers.push_str(format!("Via: MSNSLP/1.0/TLP ;branch={{{}}}\r\n", self.branch).as_str());
+        headers.push_str("CSeq: 0\r\n");
+        headers.push_str(format!("Call-ID: {{{}}}\r\n", self.call_id).as_str());
+        headers.push_str("Max-Forwards: 0\r\n");
+        headers.push_str("Content-Type: application/x-msnmsgr-sessionclosebody\r\n");
+        headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
+
+        let message = format!("{headers}{body}");
+        self.identifier += 1;
+
+        let mut bye = BinaryHeader {
+            session_id: 0,
+            identifier: self.identifier,
+            data_offset: 0,
+            total_data_size: message.len() as u64,
+            length: message.len() as u32,
+            flag: 0x00,
+            ack_identifier: rng().next_u32(),
+            ack_unique_id: 0,
+            ack_data_size: 0,
+        }
+        .to_bytes()
+        .or(Err(P2pError::BinaryHeaderReadingError))?;
+
+        bye.extend_from_slice(message.as_bytes());
+        bye.extend_from_slice(&[0; 4]);
+        Ok(bye)
     }
 
+    #[cfg(feature = "file-transfers")]
     pub async fn direct_connection_send_file(
         &mut self,
         ips: &[String],
@@ -424,18 +453,141 @@ impl P2pSession {
         from: &str,
         file: &[u8],
     ) -> Result<(), P2pError> {
-        direct_connection::send_file(
-            ips,
-            port,
-            nonce,
-            self.session_id,
-            &mut self.identifier,
-            &self.branch,
-            &self.call_id,
-            to,
-            from,
-            file,
-        )
-        .await
+        for ip in ips {
+            if let Ok(mut socket) = TcpStream::connect((ip.as_str(), port)).await {
+                let _ = socket.write_all(&u32::to_le_bytes(4)).await;
+                let _ = socket.write_all("foo\0".as_bytes()).await;
+                let _ = socket.write_all(&u32::to_le_bytes(48)).await;
+
+                let mut message = Vec::with_capacity(48);
+                self.identifier += 1;
+
+                let header = BinaryHeader {
+                    session_id: 0,
+                    identifier: self.identifier,
+                    data_offset: 0,
+                    total_data_size: 0,
+                    length: 0,
+                    flag: 0x100,
+                    ack_identifier: nonce.data1(),
+                    ack_unique_id: u32::from_be_bytes(
+                        [nonce.data3().to_be_bytes(), nonce.data2().to_be_bytes()]
+                            .concat()
+                            .try_into()
+                            .unwrap_or_default(),
+                    ),
+                    ack_data_size: u64::from_ne_bytes(nonce.data4()),
+                }
+                .to_bytes()
+                .or(Err(BinaryHeaderWritingError))?;
+
+                message.extend_from_slice(&header);
+                let _ = socket.write_all(&message).await;
+
+                let mut message = Vec::with_capacity(52);
+                while message.len() < 52 {
+                    let mut buf = vec![0; 52 - message.len()];
+                    let received = socket.read(&mut buf).await.unwrap_or_default();
+
+                    if received == 0 {
+                        break;
+                    }
+
+                    message.extend_from_slice(&buf);
+                }
+
+                let flag = u32::from_le_bytes(
+                    message
+                        .get(32..36)
+                        .unwrap_or_default()
+                        .try_into()
+                        .unwrap_or_default(),
+                );
+
+                if flag == 0x100 {
+                    let received_nonce = guid_create::GUID::build_from_components(
+                        u32::from_le_bytes(
+                            message
+                                .get(36..40)
+                                .unwrap_or_default()
+                                .try_into()
+                                .unwrap_or_default(),
+                        ),
+                        u16::from_le_bytes(
+                            message
+                                .get(40..42)
+                                .unwrap_or_default()
+                                .try_into()
+                                .unwrap_or_default(),
+                        ),
+                        u16::from_le_bytes(
+                            message
+                                .get(42..44)
+                                .unwrap_or_default()
+                                .try_into()
+                                .unwrap_or_default(),
+                        ),
+                        message
+                            .get(44..)
+                            .unwrap_or_default()
+                            .try_into()
+                            .unwrap_or(&[0; 8]),
+                    );
+
+                    if received_nonce == *nonce {
+                        let total_data_size = file.len() as u64;
+                        let mut data_offset = 0u64;
+                        self.identifier += 1;
+
+                        for chunk in file.chunks(1352) {
+                            let mut message = BinaryHeader {
+                                session_id: self.session_id,
+                                identifier: self.identifier,
+                                data_offset,
+                                total_data_size,
+                                length: chunk.len() as u32,
+                                flag: 0x1000030,
+                                ack_identifier: rng().next_u32(),
+                                ack_unique_id: 0,
+                                ack_data_size: 0,
+                            }
+                            .to_bytes()
+                            .or(Err(BinaryHeaderWritingError))?;
+
+                            data_offset += chunk.len() as u64;
+                            message.extend_from_slice(chunk);
+
+                            let _ = socket
+                                .write_all(&u32::to_le_bytes(message.len() as u32))
+                                .await;
+
+                            let _ = socket.write_all(&message).await;
+                        }
+
+                        // Receive acknowledgement
+                        let mut message = Vec::with_capacity(52);
+                        while message.len() < 52 {
+                            let mut buf = vec![0; 52 - message.len()];
+                            let received = socket.read(&mut buf).await.unwrap_or_default();
+
+                            if received == 0 {
+                                break;
+                            }
+
+                            message.extend_from_slice(&buf);
+                        }
+
+                        if let Ok(mut bye) = self.bye(to, from) {
+                            bye.truncate(bye.len() - 4);
+                            let _ = socket.write_all(&u32::to_le_bytes(bye.len() as u32)).await;
+                            let _ = socket.write_all(&bye).await;
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+
+        Err(P2pError::CouldNotSendThroughDirectConnection)
     }
 }
