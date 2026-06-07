@@ -1,12 +1,10 @@
-#[cfg(feature = "file-transfers")]
-use crate::P2pError::BinaryHeaderWritingError;
 use crate::enums::internal_event::InternalEvent;
 use crate::errors::p2p_error::P2pError;
 use crate::models::user_data::UserData;
+use crate::switchboard_server::commands::msg;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 #[cfg(feature = "file-transfers")]
 use crate::switchboard_server::p2p::file_context::FileContext;
-use crate::switchboard_server::p2p::send_display_picture;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::{DekuContainerRead, DekuContainerWrite};
@@ -41,30 +39,11 @@ impl P2pSession {
         }
     }
 
-    pub fn new_from_invite(invite: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
-        let mut invite = unsafe { str::from_utf8_unchecked(invite.as_slice()) }.split("\r\n");
-        let branch = invite
-            .find(|parameter| parameter.starts_with("Via: MSNSLP/1.0/TLP ;branch={"))
-            .ok_or(P2pError::P2pInvite)?;
-
-        let branch = guid_create::GUID::parse(
-            &branch
-                .replace("Via: MSNSLP/1.0/TLP ;branch={", "")
-                .replace("}", ""),
-        )?;
-
-        let call_id = invite
-            .find(|parameter| parameter.starts_with("Call-ID: {"))
-            .ok_or(P2pError::P2pInvite)?;
-
-        let call_id =
-            guid_create::GUID::parse(&call_id.replace("Call-ID: {", "").replace("}", ""))?;
-
-        let session_id = invite
-            .find(|parameter| parameter.starts_with("SessionID: "))
-            .ok_or(P2pError::P2pInvite)?;
-
-        let session_id = session_id.replace("SessionID: ", "").parse::<u32>()?;
+    pub fn new_from_existing_session(
+        branch: guid_create::GUID,
+        call_id: guid_create::GUID,
+        session_id: u32,
+    ) -> Result<Self, Box<dyn Error + Send>> {
         Ok(Self {
             session_id,
             identifier: rng().next_u32(),
@@ -74,41 +53,87 @@ impl P2pSession {
     }
 
     pub async fn handle_display_picture_invite(
-        destination: String,
+        &mut self,
+        to: &str,
+        from: &str,
+        context: &str,
         invite: Vec<u8>,
         user_data: Arc<RwLock<UserData>>,
         command_internal_rx: &mut Receiver<InternalEvent>,
         tr_id: Arc<AtomicU32>,
         sb_tx: Sender<Vec<u8>>,
-    ) -> Result<(), Box<dyn Error>> {
-        send_display_picture::handle_invite(
-            destination,
-            invite,
-            user_data,
+    ) -> Result<(), P2pError> {
+        {
+            let user_data = user_data.read().await;
+            let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
+
+            if to != *user_email {
+                return Err(P2pError::OtherDestination);
+            }
+        }
+
+        let ack_payload = P2pSession::acknowledge(&invite)?;
+        msg::send_p2p(&tr_id, &sb_tx, command_internal_rx, ack_payload, from).await?;
+
+        {
+            let user_data = user_data.read().await;
+            let msn_object = user_data
+                .msn_object
+                .as_ref()
+                .ok_or(P2pError::CouldNotGetUserData)?;
+
+            if context != STANDARD.encode((msn_object.to_owned() + "\0").as_bytes()) {
+                return Err(P2pError::OtherContext);
+            }
+        }
+
+        let ok_payload = self.ok(from, to)?;
+        msg::send_p2p(&tr_id, &sb_tx, command_internal_rx, ok_payload, from).await?;
+
+        let preparation_payload = self.data_preparation()?;
+        msg::send_p2p(
+            &tr_id,
+            &sb_tx,
             command_internal_rx,
-            tr_id,
-            sb_tx,
+            preparation_payload,
+            from,
         )
-        .await
+        .await?;
+
+        let user_data = user_data.read().await;
+        let display_picture = user_data
+            .display_picture
+            .as_ref()
+            .ok_or(P2pError::CouldNotGetDisplayPicture)?;
+
+        let data_payloads = self.data(display_picture, false)?;
+        for data_payload in data_payloads {
+            msg::send_p2p(&tr_id, &sb_tx, command_internal_rx, data_payload, from).await?;
+        }
+
+        Ok(())
     }
 
     pub async fn handle_display_picture_bye(
-        destination: String,
+        to: &str,
+        from: &str,
         bye: Vec<u8>,
         user_data: Arc<RwLock<UserData>>,
         command_internal_rx: &mut Receiver<InternalEvent>,
         tr_id: Arc<AtomicU32>,
         sb_tx: Sender<Vec<u8>>,
-    ) -> Result<(), Box<dyn Error>> {
-        send_display_picture::handle_bye(
-            destination,
-            bye,
-            user_data,
-            command_internal_rx,
-            tr_id,
-            sb_tx,
-        )
-        .await
+    ) -> Result<(), P2pError> {
+        {
+            let user_data = user_data.read().await;
+            let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
+
+            if to != *user_email {
+                return Err(P2pError::OtherDestination);
+            }
+        }
+
+        let ack_payload = P2pSession::acknowledge(&bye)?;
+        msg::send_p2p(&tr_id, &sb_tx, command_internal_rx, ack_payload, from).await
     }
 
     pub fn picture_invite(
@@ -282,7 +307,7 @@ impl P2pSession {
         Ok(ack_header)
     }
 
-    pub fn ok(&mut self, to: &str, from: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    pub fn ok(&mut self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
         let mut body = "EUF-GUID: {A4268EEC-FEC5-49E5-95C3-F126696BDBF6}\r\n".to_string();
         body.push_str(format!("SessionID: {}\r\n\r\n\0", self.session_id).as_str());
 
@@ -310,14 +335,15 @@ impl P2pSession {
             ack_unique_id: 0,
             ack_data_size: 0,
         }
-        .to_bytes()?;
+        .to_bytes()
+        .or(Err(P2pError::BinaryHeaderWritingError))?;
 
         ok.extend_from_slice(message.as_bytes());
         ok.extend_from_slice(&[0; 4]);
         Ok(ok)
     }
 
-    pub fn decline(&mut self, to: &str, from: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    pub fn decline(&mut self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
         let body = format!("SessionID: {}\r\n\r\n\0", self.session_id);
 
         let mut headers = "MSNSLP/1.0 603 Decline\r\n".to_string();
@@ -344,14 +370,15 @@ impl P2pSession {
             ack_unique_id: 0,
             ack_data_size: 0,
         }
-        .to_bytes()?;
+        .to_bytes()
+        .or(Err(P2pError::BinaryHeaderWritingError))?;
 
         decline.extend_from_slice(message.as_bytes());
         decline.extend_from_slice(&[0; 4]);
         Ok(decline)
     }
 
-    pub fn data_preparation(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
+    pub fn data_preparation(&mut self) -> Result<Vec<u8>, P2pError> {
         let message = &[0; 4];
         self.identifier += 1;
 
@@ -366,18 +393,15 @@ impl P2pSession {
             ack_unique_id: 0,
             ack_data_size: 0,
         }
-        .to_bytes()?;
+        .to_bytes()
+        .or(Err(P2pError::BinaryHeaderWritingError))?;
 
         data_preparation.extend_from_slice(message);
         data_preparation.extend_from_slice(&[0, 0, 0, 1]);
         Ok(data_preparation)
     }
 
-    pub fn data(
-        &mut self,
-        data: &[u8],
-        file_transfer: bool,
-    ) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
+    pub fn data(&mut self, data: &[u8], file_transfer: bool) -> Result<Vec<Vec<u8>>, P2pError> {
         let mut payloads: Vec<Vec<u8>> = Vec::new();
         let total_data_size = data.len() as u64;
         let mut data_offset = 0u64;
@@ -396,7 +420,8 @@ impl P2pSession {
                 ack_unique_id: 0,
                 ack_data_size: 0,
             }
-            .to_bytes()?;
+            .to_bytes()
+            .or(Err(P2pError::BinaryHeaderWritingError))?;
 
             data_message.extend_from_slice(chunk);
             data_message.extend_from_slice(&[0, 0, 0, 1]);
@@ -479,7 +504,7 @@ impl P2pSession {
                     ack_data_size: u64::from_ne_bytes(nonce.data4()),
                 }
                 .to_bytes()
-                .or(Err(BinaryHeaderWritingError))?;
+                .or(Err(P2pError::BinaryHeaderWritingError))?;
 
                 message.extend_from_slice(&header);
                 let _ = socket.write_all(&message).await;
@@ -552,7 +577,7 @@ impl P2pSession {
                                 ack_data_size: 0,
                             }
                             .to_bytes()
-                            .or(Err(BinaryHeaderWritingError))?;
+                            .or(Err(P2pError::BinaryHeaderWritingError))?;
 
                             data_offset += chunk.len() as u64;
                             message.extend_from_slice(chunk);

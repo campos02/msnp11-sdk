@@ -148,27 +148,42 @@ impl Switchboard {
                     event = internal_rx.recv() => {
                         if let Ok(event) = event {
                             match event {
-                                InternalEvent::P2pInvite {
-                                    destination,
+                                InternalEvent::P2pDisplayPictureInvite {
+                                    to,
+                                    from,
+                                    branch,
+                                    call_id,
+                                    session_id,
+                                    context,
                                     message: invite,
                                 } => {
-                                    let _ = P2pSession::handle_display_picture_invite(
-                                        destination,
-                                        invite,
-                                        user_data.clone(),
-                                        &mut command_internal_rx,
-                                        tr_id.clone(),
-                                        sb_tx.clone(),
-                                    )
-                                    .await;
+                                    if let Ok(mut session) = P2pSession::new_from_existing_session(
+                                        branch,
+                                        call_id,
+                                        session_id
+                                    ) {
+                                        let _ = session.handle_display_picture_invite(
+                                            &to,
+                                            &from,
+                                            &context,
+                                            invite,
+                                            user_data.clone(),
+                                            &mut command_internal_rx,
+                                            tr_id.clone(),
+                                            sb_tx.clone(),
+                                        )
+                                        .await;
+                                    }
                                 }
 
                                 InternalEvent::P2pBye {
-                                    destination,
+                                    to,
+                                    from,
                                     message: bye,
                                 } => {
                                     let _ = P2pSession::handle_display_picture_bye(
-                                        destination,
+                                        &to,
+                                        &from,
                                         bye,
                                         user_data.clone(),
                                         &mut command_internal_rx,
@@ -334,40 +349,25 @@ impl Switchboard {
                     msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
                 }
 
-                InternalEvent::P2pInvite {
-                    destination,
+                InternalEvent::P2pDisplayPictureInvite {
+                    to,
+                    from: _,
+                    branch,
+                    call_id,
+                    session_id,
+                    context: _,
                     message: invite,
                 } => {
-                    if destination != *user_email {
+                    if to != *user_email {
                         continue;
                     }
 
                     let mut internal_rx = self.internal_tx.subscribe();
-                    let invite_string = unsafe { str::from_utf8_unchecked(invite.as_slice()) };
-                    let mut invite_parameters = invite_string.lines();
-
-                    invite_parameters.next();
-                    let to = invite_parameters.next().ok_or(P2pError::InviteError)?;
-
-                    if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
-                        continue;
-                    }
-
-                    let from = invite_parameters
-                        .next()
-                        .ok_or(P2pError::InviteError)?
-                        .replace("From: <msnmsgr:", "")
-                        .replace(">", "");
-
-                    let mut session =
-                        P2pSession::new_from_invite(&invite).or(Err(P2pError::InviteError))?;
-
-                    let decline = session
-                        .decline(from.as_str(), to)
+                    session = P2pSession::new_from_existing_session(branch, call_id, session_id)
                         .or(Err(P2pError::InviteError))?;
 
-                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, decline, email)
-                        .await?;
+                    let ack = P2pSession::acknowledge(&invite)?;
+                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
                 }
 
                 InternalEvent::P2pData {
@@ -529,42 +529,6 @@ impl Switchboard {
                     break;
                 }
 
-                InternalEvent::P2pInvite {
-                    destination,
-                    message: invite,
-                } => {
-                    if destination != *user_email {
-                        continue;
-                    }
-
-                    let mut internal_rx = self.internal_tx.subscribe();
-                    let invite_string = unsafe { str::from_utf8_unchecked(invite.as_slice()) };
-                    let mut invite_parameters = invite_string.lines();
-
-                    invite_parameters.next();
-                    let to = invite_parameters.next().ok_or(P2pError::InviteError)?;
-
-                    if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
-                        continue;
-                    }
-
-                    let from = invite_parameters
-                        .next()
-                        .ok_or(P2pError::InviteError)?
-                        .replace("From: <msnmsgr:", "")
-                        .replace(">", "");
-
-                    let mut session =
-                        P2pSession::new_from_invite(&invite).or(Err(P2pError::InviteError))?;
-
-                    let decline = session
-                        .decline(from.as_str(), to)
-                        .or(Err(P2pError::InviteError))?;
-
-                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, decline, email)
-                        .await?;
-                }
-
                 InternalEvent::P2pDecline {
                     destination,
                     message,
@@ -586,8 +550,8 @@ impl Switchboard {
 
         // Check if the transfer was cancelled at some point
         while let Ok(event) = internal_rx.try_recv() {
-            if let InternalEvent::P2pBye { destination, .. } = event
-                && destination == *user_email
+            if let InternalEvent::P2pBye { to, .. } = event
+                && to == *user_email
             {
                 return Err(P2pError::FileTransferCancelled);
             }

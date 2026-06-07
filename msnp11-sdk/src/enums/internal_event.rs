@@ -14,8 +14,33 @@ pub(crate) enum InternalEvent {
         port: u16,
     },
 
-    P2pInvite {
-        destination: String,
+    P2pDisplayPictureInvite {
+        to: String,
+        from: String,
+        branch: guid_create::GUID,
+        call_id: guid_create::GUID,
+        session_id: u32,
+        context: String,
+        message: Vec<u8>,
+    },
+
+    #[cfg(feature = "file-transfers")]
+    P2pFileTransferInvite {
+        to: String,
+        from: String,
+        branch: guid_create::GUID,
+        call_id: guid_create::GUID,
+        session_id: u32,
+        context: String,
+        message: Vec<u8>,
+    },
+
+    #[cfg(feature = "file-transfers")]
+    P2pDirectConnectionInvite {
+        to: String,
+        from: String,
+        branch: guid_create::GUID,
+        call_id: guid_create::GUID,
         message: Vec<u8>,
     },
 
@@ -50,7 +75,8 @@ pub(crate) enum InternalEvent {
     },
 
     P2pBye {
-        destination: String,
+        to: String,
+        from: String,
         message: Vec<u8>,
     },
 }

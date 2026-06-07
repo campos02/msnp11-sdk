@@ -184,17 +184,128 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                 }
 
                 if payload.contains("INVITE") {
-                    return InternalEvent::P2pInvite {
-                        destination,
-                        message: binary_payload,
-                    };
+                    let lines = payload.lines();
+
+                    let mut to = None;
+                    let mut from = None;
+                    let mut branch = None;
+                    let mut call_id = None;
+                    let mut content_type = None;
+                    let mut euf_guid = None;
+                    let mut session_id = None;
+                    let mut context = None;
+
+                    for line in lines {
+                        if line.contains("To: ") {
+                            to = Some(line.replace("To: <msnmsgr:", "").replace(">", ""));
+                        } else if line.contains("From: ") {
+                            from = Some(line.replace("From: <msnmsgr:", "").replace(">", ""));
+                        } else if line.contains("Via: MSNSLP/1.0/TLP ;branch={") {
+                            branch = guid_create::GUID::parse(
+                                &line
+                                    .replace("Via: MSNSLP/1.0/TLP ;branch={", "")
+                                    .replace("}", ""),
+                            )
+                            .ok();
+                        } else if line.contains("Call-ID: {") {
+                            call_id = guid_create::GUID::parse(
+                                &line.replace("Call-ID: {", "").replace("}", ""),
+                            )
+                            .ok();
+                        } else if line.contains("Content-Type: ") {
+                            content_type = Some(line.replace("Content-Type: ", ""));
+                        } else if line.contains("EUF-GUID: ") {
+                            euf_guid = Some(line.replace("EUF-GUID: ", ""));
+                        } else if line.contains("SessionID: ") {
+                            session_id = line.replace("SessionID: ", "").parse::<u32>().ok();
+                        } else if line.contains("Context: ") {
+                            context = Some(line.replace("Context: ", ""));
+                        }
+                    }
+
+                    if let Some(to) = to
+                        && let Some(from) = from
+                        && let Some(branch) = branch
+                        && let Some(call_id) = call_id
+                        && let Some(content_type) = content_type
+                    {
+                        match content_type.as_str() {
+                            "application/x-msnmsgr-sessionreqbody" => {
+                                if let Some(euf_guid) = euf_guid
+                                    && let Some(session_id) = session_id
+                                    && let Some(context) = context
+                                {
+                                    match euf_guid.as_str() {
+                                        "EUF-GUID: {A4268EEC-FEC5-49E5-95C3-F126696BDBF6}" => {
+                                            return InternalEvent::P2pDisplayPictureInvite {
+                                                to,
+                                                from,
+                                                branch,
+                                                call_id,
+                                                session_id,
+                                                context,
+                                                message: binary_payload,
+                                            };
+                                        }
+
+                                        #[cfg(feature = "file-transfers")]
+                                        "EUF-GUID: {5D3E02AB-6190-11D3-BBBB-00C04F795683}" => {
+                                            return InternalEvent::P2pFileTransferInvite {
+                                                to,
+                                                from,
+                                                branch,
+                                                call_id,
+                                                session_id,
+                                                context,
+                                                message: binary_payload,
+                                            };
+                                        }
+
+                                        _ => (),
+                                    }
+                                }
+                            }
+
+                            #[cfg(feature = "file-transfers")]
+                            "application/x-msnmsgr-transrespbody" => {
+                                return InternalEvent::P2pDirectConnectionInvite {
+                                    to,
+                                    from,
+                                    branch,
+                                    call_id,
+                                    message: binary_payload,
+                                };
+                            }
+
+                            _ => (),
+                        }
+                    }
                 }
 
                 if payload.contains("BYE") {
-                    return InternalEvent::P2pBye {
-                        destination,
-                        message: binary_payload,
-                    };
+                    let lines = payload.lines();
+
+                    let mut to = None;
+                    let mut from = None;
+
+                    for line in lines {
+                        if line.contains("To: ") {
+                            to = Some(line.replace("To: <msnmsgr:", "").replace(">", ""));
+                        } else if line.contains("From: ") {
+                            from = Some(line.replace("From: <msnmsgr:", "").replace(">", ""));
+                            break;
+                        }
+                    }
+
+                    if let Some(to) = to
+                        && let Some(from) = from
+                    {
+                        return InternalEvent::P2pBye {
+                            to,
+                            from,
+                            message: binary_payload,
+                        };
+                    }
                 }
             }
 
