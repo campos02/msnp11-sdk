@@ -555,7 +555,7 @@ impl Client {
         let sha1c = STANDARD.encode(hash.digest().bytes());
         let msn_object = MsnObject {
             creator: (*user_email).clone(),
-            size: display_picture.len() as u32,
+            size: display_picture.len() as u64,
             object_type: 3,
             location: "PIC.tmp".to_string(),
             friendly: "AAA=".to_string(),

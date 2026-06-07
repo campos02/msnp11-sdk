@@ -8,7 +8,7 @@ pub struct MsnObject {
     #[serde(rename = "@Creator")]
     pub creator: String,
     #[serde(rename = "@Size")]
-    pub size: u32,
+    pub size: u64,
     #[serde(rename = "@Type")]
     pub object_type: u16,
     #[serde(rename = "@Location")]
