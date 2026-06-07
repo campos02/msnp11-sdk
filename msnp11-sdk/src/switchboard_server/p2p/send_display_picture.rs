@@ -106,7 +106,7 @@ pub async fn handle_invite(
         .as_ref()
         .ok_or(P2pError::CouldNotGetDisplayPicture)?;
 
-    let data_payloads = session.data(display_picture)?;
+    let data_payloads = session.data(display_picture, false)?;
     for data_payload in data_payloads {
         msg::send_p2p(
             &tr_id,

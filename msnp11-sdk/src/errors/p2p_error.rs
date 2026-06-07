@@ -34,4 +34,6 @@ pub enum P2pError {
     CouldNotSendThroughDirectConnection,
     #[error("Could not send file")]
     CouldNotSendFile,
+    #[error("File transfer was cancelled")]
+    FileTransferCancelled,
 }

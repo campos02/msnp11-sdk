@@ -15,11 +15,11 @@ pub fn bye(
     let mut headers = format!("BYE MSNMSGR:{to} MSNSLP/1.0\r\n");
     headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());
     headers.push_str(format!("From: <msnmsgr:{from}>\r\n").as_str());
-    headers.push_str(format!("Via: MSNSLP/1.0/TLP ;branch={{{}}}\r\n", branch).as_str());
+    headers.push_str(format!("Via: MSNSLP/1.0/TLP ;branch={{{branch}}}\r\n").as_str());
     headers.push_str("CSeq: 0\r\n");
-    headers.push_str(format!("Call-ID: {{{}}}\r\n", call_id).as_str());
+    headers.push_str(format!("Call-ID: {{{call_id}}}\r\n").as_str());
     headers.push_str("Max-Forwards: 0\r\n");
-    headers.push_str("Content-Type: application/x-msnmsgr-sessionreqbody\r\n");
+    headers.push_str("Content-Type: application/x-msnmsgr-sessionclosebody\r\n");
     headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
     let message = format!("{headers}{body}");

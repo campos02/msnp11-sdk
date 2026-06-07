@@ -551,8 +551,9 @@ impl Switchboard {
                             .await
                             .is_err()
                         {
-                            let data_payloads =
-                                session.data(file).or(Err(P2pError::CouldNotSendFile))?;
+                            let data_payloads = session
+                                .data(file, true)
+                                .or(Err(P2pError::CouldNotSendFile))?;
 
                             for data_payload in data_payloads {
                                 msg::send_p2p(
@@ -618,6 +619,19 @@ impl Switchboard {
 
                     msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, decline, email)
                         .await?;
+                }
+
+                InternalEvent::P2pBye { destination, .. } => {
+                    {
+                        let user_data = self.user_data.read().await;
+                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
+
+                        if destination != *user_email {
+                            continue;
+                        }
+                    }
+
+                    return Err(P2pError::FileTransferCancelled);
                 }
 
                 _ => (),

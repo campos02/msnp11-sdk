@@ -376,7 +376,11 @@ impl P2pSession {
         Ok(data_preparation)
     }
 
-    pub fn data(&mut self, data: &[u8]) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
+    pub fn data(
+        &mut self,
+        data: &[u8],
+        file_transfer: bool,
+    ) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
         let mut payloads: Vec<Vec<u8>> = Vec::new();
         let total_data_size = data.len() as u64;
         let mut data_offset = 0u64;
@@ -390,7 +394,7 @@ impl P2pSession {
                 data_offset,
                 total_data_size,
                 length: chunk.len() as u32,
-                flag: 0x20,
+                flag: if file_transfer { 0x1000030 } else { 0x20 },
                 ack_identifier: rng().next_u32(),
                 ack_unique_id: 0,
                 ack_data_size: 0,

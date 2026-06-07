@@ -19,6 +19,7 @@ pub(crate) enum InternalEvent {
         message: Vec<u8>,
     },
 
+    P2pAck,
     P2pShouldAck {
         destination: String,
         message: Vec<u8>,
