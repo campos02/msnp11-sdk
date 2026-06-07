@@ -46,7 +46,7 @@ impl P2pSession {
         };
 
         let Ok(branch) = guid_create::GUID::parse(
-            &*branch
+            &branch
                 .replace("Via: MSNSLP/1.0/TLP ;branch={", "")
                 .replace("}", ""),
         ) else {
@@ -58,7 +58,7 @@ impl P2pSession {
         };
 
         let Ok(call_id) =
-            guid_create::GUID::parse(&*call_id.replace("Call-ID: {", "").replace("}", ""))
+            guid_create::GUID::parse(&call_id.replace("Call-ID: {", "").replace("}", ""))
         else {
             return Err(P2pError::P2pInvite.into());
         };
@@ -209,7 +209,7 @@ impl P2pSession {
             to,
             from,
             &body,
-            self.call_id.clone(),
+            self.call_id,
             "application/x-msnmsgr-transreqbody",
         )
     }

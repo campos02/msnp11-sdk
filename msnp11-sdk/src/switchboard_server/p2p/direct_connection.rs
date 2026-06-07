@@ -7,6 +7,7 @@ use rand::{Rng, rng};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn send_file(
     ips: &[String],
     port: u16,

@@ -98,10 +98,6 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                     return InternalEvent::ServerReply(reply);
                 };
 
-                if binary_header.flag == 0x02 {
-                    return InternalEvent::P2pAck;
-                }
-
                 if binary_header.total_data_size == 4 && binary_payload[48..52].eq(&[0; 4]) {
                     return InternalEvent::P2pShouldAck {
                         destination,
@@ -175,6 +171,13 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                     }
 
                     return InternalEvent::P2pOk {
+                        destination,
+                        message: binary_payload,
+                    };
+                }
+
+                if payload.contains("603 Decline") {
+                    return InternalEvent::P2pDecline {
                         destination,
                         message: binary_payload,
                     };

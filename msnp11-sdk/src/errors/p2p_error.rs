@@ -36,4 +36,6 @@ pub enum P2pError {
     CouldNotSendFile,
     #[error("File transfer was cancelled")]
     FileTransferCancelled,
+    #[error("File transfer was declined")]
+    FileTransferDeclined,
 }

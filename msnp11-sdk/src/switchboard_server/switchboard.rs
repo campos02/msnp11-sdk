@@ -306,13 +306,13 @@ impl Switchboard {
         let mut internal_rx = self.internal_tx.subscribe();
         let mut session = P2pSession::new();
 
-        let invite;
+        let user_email;
         {
             let user_data = self.user_data.read().await;
-            let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-            invite = session.picture_invite(email, user_email, msn_object)?
+            user_email = user_data.email.clone().ok_or(P2pError::NotLoggedIn)?;
         }
 
+        let invite = session.picture_invite(email, &user_email, msn_object)?;
         {
             let mut internal_rx = self.internal_tx.subscribe();
             msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, invite, email).await?;
@@ -325,13 +325,8 @@ impl Switchboard {
                     destination,
                     message,
                 } => {
-                    {
-                        let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-
-                        if destination != *user_email {
-                            continue;
-                        }
+                    if destination != *user_email {
+                        continue;
                     }
 
                     let mut internal_rx = self.internal_tx.subscribe();
@@ -343,13 +338,8 @@ impl Switchboard {
                     destination,
                     message: invite,
                 } => {
-                    {
-                        let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-
-                        if destination != *user_email {
-                            continue;
-                        }
+                    if destination != *user_email {
+                        continue;
                     }
 
                     let mut internal_rx = self.internal_tx.subscribe();
@@ -359,13 +349,8 @@ impl Switchboard {
                     invite_parameters.next();
                     let to = invite_parameters.next().ok_or(P2pError::InviteError)?;
 
-                    {
-                        let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-
-                        if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
-                            continue;
-                        }
+                    if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
+                        continue;
                     }
 
                     let from = invite_parameters
@@ -389,13 +374,8 @@ impl Switchboard {
                     destination,
                     message: data,
                 } => {
-                    {
-                        let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-
-                        if destination != *user_email {
-                            continue;
-                        }
+                    if destination != *user_email {
+                        continue;
                     }
 
                     let binary_header = data.get(..48).ok_or(P2pError::BinaryHeaderReadingError)?;
@@ -426,14 +406,9 @@ impl Switchboard {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
-        let bye;
-        {
-            let user_data = self.user_data.read().await;
-            let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-            bye = session.bye(email, user_email)?;
-        }
-
+        let bye = session.bye(email, &user_email)?;
         msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, bye, email).await?;
+
         self.event_tx
             .send(Event::DisplayPicture {
                 email: email.to_owned(),
@@ -455,13 +430,13 @@ impl Switchboard {
         let mut session = P2pSession::new();
         let mut internal_rx = self.internal_tx.subscribe();
 
-        let invite;
+        let user_email;
         {
             let user_data = self.user_data.read().await;
-            let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-            invite = session.file_invite(email, user_email, file_name, file.len() as u64)?
+            user_email = user_data.email.clone().ok_or(P2pError::NotLoggedIn)?;
         }
 
+        let invite = session.file_invite(email, &user_email, file_name, file.len() as u64)?;
         {
             let mut internal_rx = self.internal_tx.subscribe();
             msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, invite, email).await?;
@@ -473,13 +448,8 @@ impl Switchboard {
                     destination,
                     message,
                 } => {
-                    {
-                        let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-
-                        if destination != *user_email {
-                            continue;
-                        }
+                    if destination != *user_email {
+                        continue;
                     }
 
                     let mut internal_rx = self.internal_tx.subscribe();
@@ -491,26 +461,15 @@ impl Switchboard {
                     destination,
                     message,
                 } => {
-                    {
-                        let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-
-                        if destination != *user_email {
-                            continue;
-                        }
+                    if destination != *user_email {
+                        continue;
                     }
 
                     let mut internal_rx = self.internal_tx.subscribe();
                     let ack = P2pSession::acknowledge(&message)?;
                     msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
 
-                    let invite;
-                    {
-                        let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-                        invite = session.direct_connection_invite(email, user_email)?;
-                    }
-
+                    let invite = session.direct_connection_invite(email, &user_email)?;
                     msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, invite, email)
                         .await?;
                 }
@@ -524,12 +483,6 @@ impl Switchboard {
                     ips,
                     port,
                 } => {
-                    let user_email;
-                    {
-                        let user_data = self.user_data.read().await;
-                        user_email = user_data.email.clone().ok_or(P2pError::NotLoggedIn)?;
-                    }
-
                     if destination != user_email {
                         continue;
                     }
@@ -541,7 +494,7 @@ impl Switchboard {
                     if listening && bridge == "TCPv1" {
                         if session
                             .direct_connection_send_file(
-                                &*ips,
+                                &ips,
                                 port,
                                 &nonce,
                                 email,
@@ -579,13 +532,8 @@ impl Switchboard {
                     destination,
                     message: invite,
                 } => {
-                    {
-                        let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-
-                        if destination != *user_email {
-                            continue;
-                        }
+                    if destination != *user_email {
+                        continue;
                     }
 
                     let mut internal_rx = self.internal_tx.subscribe();
@@ -595,13 +543,8 @@ impl Switchboard {
                     invite_parameters.next();
                     let to = invite_parameters.next().ok_or(P2pError::InviteError)?;
 
-                    {
-                        let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-
-                        if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
-                            continue;
-                        }
+                    if !to.contains(format!("msnmsgr:{user_email}").as_str()) {
+                        continue;
                     }
 
                     let from = invite_parameters
@@ -621,20 +564,31 @@ impl Switchboard {
                         .await?;
                 }
 
-                InternalEvent::P2pBye { destination, .. } => {
-                    {
-                        let user_data = self.user_data.read().await;
-                        let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
-
-                        if destination != *user_email {
-                            continue;
-                        }
+                InternalEvent::P2pDecline {
+                    destination,
+                    message,
+                } => {
+                    if destination != *user_email {
+                        continue;
                     }
 
-                    return Err(P2pError::FileTransferCancelled);
+                    let mut internal_rx = self.internal_tx.subscribe();
+                    let ack = P2pSession::acknowledge(&message)?;
+                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
+
+                    return Err(P2pError::FileTransferDeclined);
                 }
 
                 _ => (),
+            }
+        }
+
+        // Check if the transfer was cancelled at some point
+        while let Ok(event) = internal_rx.try_recv() {
+            if let InternalEvent::P2pBye { destination, .. } = event
+                && destination == *user_email
+            {
+                return Err(P2pError::FileTransferCancelled);
             }
         }
 
