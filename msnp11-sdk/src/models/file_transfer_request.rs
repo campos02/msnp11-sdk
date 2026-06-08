@@ -6,5 +6,4 @@ pub struct FileTransferRequest {
     pub(crate) branch: String,
     pub(crate) call_id: String,
     pub(crate) session_id: u32,
-    pub(crate) message: Vec<u8>,
 }

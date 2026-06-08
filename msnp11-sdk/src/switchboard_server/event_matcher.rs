@@ -108,7 +108,10 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                     };
                 }
 
-                if binary_header.flag == 0x20 || binary_header.flag == 0x1000020 {
+                if binary_header.flag == 0x20
+                    || binary_header.flag == 0x1000020
+                    || binary_header.flag == 0x1000030
+                {
                     return InternalEvent::P2pData {
                         destination,
                         message: binary_payload[..(binary_payload.len() - 4)].to_vec(),
@@ -316,7 +319,7 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                             }
 
                             #[cfg(feature = "file-transfers")]
-                            "application/x-msnmsgr-transrespbody" => {
+                            "application/x-msnmsgr-transreqbody" => {
                                 return InternalEvent::P2pDirectConnectionInvite {
                                     to,
                                     branch,

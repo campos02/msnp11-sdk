@@ -14,6 +14,8 @@ use core::str;
 use deku::{DekuContainerRead, DekuContainerWrite};
 #[cfg(feature = "file-transfers")]
 use getifs::interface_addrs;
+#[cfg(feature = "file-transfers")]
+use getifs::{private_ipv4_addrs_by_filter, public_ipv6_addrs_by_filter};
 use rand::Rng;
 use rand::rng;
 use std::io::Cursor;
@@ -242,6 +244,7 @@ impl P2pSession {
             "Nonce: {{{}}}\r\n\r\n\0",
             guid_create::GUID::rand()
         ));
+
         self.invite(
             to,
             from,
@@ -365,25 +368,24 @@ impl P2pSession {
         let nonce = guid_create::GUID::rand();
         let mut body = "Bridge: TCPv1\r\n".to_string();
         body.push_str("Listening: true\r\n");
-        body.push_str(format!("Nonce: {nonce}\r\n",).as_str());
+        body.push_str(format!("Nonce: {{{nonce}}}\r\n",).as_str());
 
-        let ips = interface_addrs().or(Err(P2pError::CouldNotGetIpAddress))?;
-        let mut ipv4s = Vec::new();
-        let mut ipv6s = Vec::new();
+        let ipv4s = private_ipv4_addrs_by_filter(|addr| {
+            !addr.is_unspecified()
+                && !addr.is_loopback()
+                && !addr.is_multicast()
+                && !addr.is_link_local()
+        })
+        .or(Err(P2pError::CouldNotGetIpAddress))?;
 
-        for ip in ips {
-            if !ip.addr().is_loopback() && !ip.addr().is_multicast() {
-                if ip.addr().is_ipv6() {
-                    ipv6s.push(ip.addr());
-                } else {
-                    ipv4s.push(ip.addr());
-                }
-            }
-        }
+        let ipv6s = public_ipv6_addrs_by_filter(|addr| {
+            !addr.is_unspecified() && !addr.is_loopback() && !addr.is_multicast()
+        })
+        .or(Err(P2pError::CouldNotGetIpAddress))?;
 
         body.push_str("IPv4Internal-Addrs: ");
         for ip in ipv4s {
-            body.push_str(format!("{ip} ").as_str());
+            body.push_str(format!("{} ", ip.addr()).as_str());
         }
 
         body.pop();
@@ -399,14 +401,14 @@ impl P2pSession {
 
         body.push_str("IPv6-Addrs: ");
         for ip in ipv6s {
-            body.push_str(format!("{ip} ").as_str());
+            body.push_str(format!("{} ", ip.addr()).as_str());
         }
 
         body.pop();
         body.push_str("\r\n");
 
         let mut ipv6_listener = None;
-        if let Ok(listener) = TcpListener::bind("0.0.0.0:0").await
+        if let Ok(listener) = TcpListener::bind(":::0").await
             && let Ok(local_addr) = listener.local_addr()
         {
             body.push_str(format!("IPv6-Port: {}\r\n", local_addr.port()).as_str());

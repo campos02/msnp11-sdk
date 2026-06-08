@@ -186,6 +186,10 @@ impl Switchboard {
                                     file_name,
                                     message,
                                 } => {
+                                    if let Ok(ack) = P2pSession::acknowledge(&message) {
+                                        let _ = msg::send_p2p(&tr_id, &sb_tx, &mut command_internal_rx, ack, &from).await;
+                                    }
+
                                     let _ = event_tx.send(Event::FileTransferRequest {
                                         file_name,
                                         file_size,
@@ -195,7 +199,6 @@ impl Switchboard {
                                             branch: branch.to_string(),
                                             call_id: call_id.to_string(),
                                             session_id,
-                                            message
                                         }
                                     }).await.map_err(|error| error!("{error}"));
                                 }
@@ -602,11 +605,9 @@ impl Switchboard {
         let call_id = guid_create::GUID::parse(&request.call_id).or(Err(P2pError::P2pInvite))?;
         let session = P2pSession::new_from_existing_session(branch, call_id, request.session_id);
 
-        let ack = P2pSession::acknowledge(&request.message)?;
         let ok = session.ok(&email, &user_email)?;
         {
             let mut internal_rx = self.internal_tx.subscribe();
-            msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, &email).await?;
             msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ok, &email).await?;
         }
 
@@ -732,31 +733,16 @@ impl Switchboard {
             }
         }
 
+        let user_email = request.to;
+        let email = request.from;
+
         let mut internal_rx = self.internal_tx.subscribe();
-        let ack = P2pSession::acknowledge(&request.message)?;
-
-        msg::send_p2p(
-            &self.tr_id,
-            &self.sb_tx,
-            &mut internal_rx,
-            ack,
-            &request.from,
-        )
-        .await?;
-
         let branch = guid_create::GUID::parse(&request.branch).or(Err(P2pError::P2pInvite))?;
         let call_id = guid_create::GUID::parse(&request.call_id).or(Err(P2pError::P2pInvite))?;
         let session = P2pSession::new_from_existing_session(branch, call_id, request.session_id);
 
-        let decline = session.decline(&request.from, &request.to)?;
-        msg::send_p2p(
-            &self.tr_id,
-            &self.sb_tx,
-            &mut internal_rx,
-            decline,
-            &request.to,
-        )
-        .await
+        let decline = session.decline(&email, &user_email)?;
+        msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, decline, &email).await
     }
 
     /// Disconnects from the Switchboard.
