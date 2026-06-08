@@ -367,6 +367,10 @@ impl Switchboard {
                 InternalEvent::P2pShouldAck {
                     destination,
                     message,
+                }
+                | InternalEvent::P2pOk {
+                    destination,
+                    message,
                 } => {
                     if destination != *user_email {
                         continue;

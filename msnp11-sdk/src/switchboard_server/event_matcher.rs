@@ -102,6 +102,7 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                     return InternalEvent::ServerReply(reply);
                 };
 
+                // Data preparation
                 if binary_header.total_data_size == 4 && binary_payload[48..52].eq(&[0; 4]) {
                     return InternalEvent::P2pShouldAck {
                         destination,
@@ -119,8 +120,8 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                     };
                 }
 
-                #[cfg(feature = "file-transfers")]
                 if payload.contains("200 OK") {
+                    #[cfg(feature = "file-transfers")]
                     if payload.contains("application/x-msnmsgr-transrespbody") {
                         let lines = payload.lines();
 

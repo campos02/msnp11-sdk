@@ -384,6 +384,7 @@ impl P2pSession {
         Ok(ok)
     }
 
+    #[cfg(feature = "file-transfers")]
     pub fn decline(&mut self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
         let body = format!("SessionID: {}\r\n\r\n\0", self.session_id);
 

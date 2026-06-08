@@ -49,7 +49,6 @@ pub(crate) enum InternalEvent {
         message: Vec<u8>,
     },
 
-    #[cfg(feature = "file-transfers")]
     P2pOk {
         destination: String,
         message: Vec<u8>,
