@@ -2,6 +2,9 @@ use crate::enums::event::Event;
 use crate::enums::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
+use crate::switchboard_server::p2p::file_context::FileContext;
+#[cfg(feature = "file-transfers")]
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::DekuContainerRead;
 use std::io::Cursor;
@@ -112,8 +115,8 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                     };
                 }
 
+                #[cfg(feature = "file-transfers")]
                 if payload.contains("200 OK") {
-                    #[cfg(feature = "file-transfers")]
                     if payload.contains("application/x-msnmsgr-transrespbody") {
                         let lines = payload.lines();
 
@@ -176,6 +179,7 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                     };
                 }
 
+                #[cfg(feature = "file-transfers")]
                 if payload.contains("603 Decline") {
                     return InternalEvent::P2pDecline {
                         destination,
@@ -219,7 +223,8 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                         } else if line.contains("SessionID: ") {
                             session_id = line.replace("SessionID: ", "").parse::<u32>().ok();
                         } else if line.contains("Context: ") {
-                            context = Some(line.replace("Context: ", ""));
+                            context =
+                                Some(line.replace("Context: ", "").trim_matches('\0').to_string());
                         }
                     }
 
@@ -233,11 +238,11 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                             "application/x-msnmsgr-sessionreqbody" => {
                                 if let Some(euf_guid) = euf_guid
                                     && let Some(session_id) = session_id
-                                    && let Some(context) = context
+                                    && let Some(mut context) = context
                                 {
                                     match euf_guid.as_str() {
-                                        "EUF-GUID: {A4268EEC-FEC5-49E5-95C3-F126696BDBF6}" => {
-                                            return InternalEvent::P2pDisplayPictureInvite {
+                                        "{A4268EEC-FEC5-49E5-95C3-F126696BDBF6}" => {
+                                            return InternalEvent::DisplayPictureInvite {
                                                 to,
                                                 from,
                                                 branch,
@@ -249,14 +254,58 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                                         }
 
                                         #[cfg(feature = "file-transfers")]
-                                        "EUF-GUID: {5D3E02AB-6190-11D3-BBBB-00C04F795683}" => {
-                                            return InternalEvent::P2pFileTransferInvite {
+                                        "{5D3E02AB-6190-11D3-BBBB-00C04F795683}" => {
+                                            // Padding
+                                            while context.len() % 4 != 0 {
+                                                context.push('=');
+                                            }
+
+                                            let Ok(context) = STANDARD.decode(context) else {
+                                                return InternalEvent::ServerReply(reply);
+                                            };
+
+                                            let Some((file_info, file_name)) =
+                                                context.split_at_checked(20)
+                                            else {
+                                                return InternalEvent::ServerReply(reply);
+                                            };
+
+                                            let mut cursor = Cursor::new(file_info);
+                                            let Ok((_, context)) =
+                                                FileContext::from_reader((&mut cursor, 0))
+                                            else {
+                                                return InternalEvent::ServerReply(reply);
+                                            };
+
+                                            let mut utf16_file_name =
+                                                Vec::with_capacity(file_name.len() / 2);
+
+                                            let mut even_byte = 0;
+                                            for (i, byte) in file_name.iter().enumerate() {
+                                                if i % 2 != 0 {
+                                                    if even_byte == 0 && *byte == 0 {
+                                                        break;
+                                                    }
+
+                                                    utf16_file_name.push(u16::from_le_bytes([
+                                                        even_byte, *byte,
+                                                    ]));
+                                                } else {
+                                                    even_byte = *byte;
+                                                }
+                                            }
+
+                                            let file_name =
+                                                String::from_utf16_lossy(&utf16_file_name);
+
+                                            return InternalEvent::FileTransferInvite {
                                                 to,
                                                 from,
                                                 branch,
                                                 call_id,
                                                 session_id,
-                                                context,
+                                                file_size: context.file_size,
+                                                file_name,
                                                 message: binary_payload,
                                             };
                                         }
@@ -270,7 +319,6 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                             "application/x-msnmsgr-transrespbody" => {
                                 return InternalEvent::P2pDirectConnectionInvite {
                                     to,
-                                    from,
                                     branch,
                                     call_id,
                                     message: binary_payload,

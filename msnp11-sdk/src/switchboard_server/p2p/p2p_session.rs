@@ -4,7 +4,11 @@ use crate::models::user_data::UserData;
 use crate::switchboard_server::commands::msg;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
 #[cfg(feature = "file-transfers")]
+use crate::switchboard_server::p2p::direct_connection_ok_result::DirectConnectionOkResult;
+#[cfg(feature = "file-transfers")]
 use crate::switchboard_server::p2p::file_context::FileContext;
+#[cfg(feature = "file-transfers")]
+use crate::switchboard_server::p2p::listen_for_file::listen_for_file;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use core::str;
 use deku::{DekuContainerRead, DekuContainerWrite};
@@ -12,28 +16,36 @@ use deku::{DekuContainerRead, DekuContainerWrite};
 use getifs::interface_addrs;
 use rand::Rng;
 use rand::rng;
-use std::error::Error;
 use std::io::Cursor;
 use std::sync::Arc;
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::{AtomicU32, Ordering};
+#[cfg(feature = "file-transfers")]
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+#[cfg(feature = "file-transfers")]
+use tokio::net::TcpListener;
+#[cfg(feature = "file-transfers")]
 use tokio::net::TcpStream;
-use tokio::sync::RwLock;
-use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::{RwLock, broadcast};
 
 pub struct P2pSession {
     session_id: u32,
-    identifier: u32,
+    identifier: Arc<AtomicU32>,
     branch: guid_create::GUID,
     call_id: guid_create::GUID,
+}
+
+impl Default for P2pSession {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl P2pSession {
     pub fn new() -> Self {
         Self {
             session_id: 0,
-            identifier: rng().next_u32(),
+            identifier: Arc::new(AtomicU32::new(rng().next_u32())),
             branch: guid_create::GUID::default(),
             call_id: guid_create::GUID::default(),
         }
@@ -43,23 +55,24 @@ impl P2pSession {
         branch: guid_create::GUID,
         call_id: guid_create::GUID,
         session_id: u32,
-    ) -> Result<Self, Box<dyn Error + Send>> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             session_id,
-            identifier: rng().next_u32(),
+            identifier: Arc::new(AtomicU32::new(rng().next_u32())),
             branch,
             call_id,
-        })
+        }
     }
 
-    pub async fn handle_display_picture_invite(
-        &mut self,
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn handle_display_picture_invite(
+        &self,
         to: &str,
         from: &str,
         context: &str,
         invite: Vec<u8>,
         user_data: Arc<RwLock<UserData>>,
-        command_internal_rx: &mut Receiver<InternalEvent>,
+        command_internal_rx: &mut broadcast::Receiver<InternalEvent>,
         tr_id: Arc<AtomicU32>,
         sb_tx: Sender<Vec<u8>>,
     ) -> Result<(), P2pError> {
@@ -114,12 +127,12 @@ impl P2pSession {
         Ok(())
     }
 
-    pub async fn handle_display_picture_bye(
+    pub(crate) async fn handle_bye(
         to: &str,
         from: &str,
         bye: Vec<u8>,
         user_data: Arc<RwLock<UserData>>,
-        command_internal_rx: &mut Receiver<InternalEvent>,
+        command_internal_rx: &mut broadcast::Receiver<InternalEvent>,
         tr_id: Arc<AtomicU32>,
         sb_tx: Sender<Vec<u8>>,
     ) -> Result<(), P2pError> {
@@ -184,17 +197,18 @@ impl P2pSession {
         utf16_file_name.extend_from_slice(&[255; 4]);
 
         // 574 will work with the official clients, 1 means no preview
-        let context = FileContext {
+        let mut context = FileContext {
             size: 574,
             second_field: 2,
             file_size,
             preview: 1,
-            file_name: utf16_file_name,
         }
         .to_bytes()
         .or(Err(P2pError::InviteError))?;
 
+        context.extend_from_slice(&utf16_file_name);
         self.session_id = rng().next_u32();
+
         let mut body = "EUF-GUID: {5D3E02AB-6190-11D3-BBBB-00C04F795683}\r\n".to_string();
         body.push_str(format!("SessionID: {}\r\n", self.session_id).as_str());
         body.push_str("AppID: 2\r\n");
@@ -224,9 +238,10 @@ impl P2pSession {
             body.push_str(&format!("IPv6-global: {}\r\n", ip.addr()));
         }
 
-        let nonce = guid_create::GUID::rand();
-        body.push_str(&format!("Nonce: {{{}}}\r\n\r\n\0", &nonce));
-
+        body.push_str(&format!(
+            "Nonce: {{{}}}\r\n\r\n\0",
+            guid_create::GUID::rand()
+        ));
         self.invite(
             to,
             from,
@@ -256,11 +271,11 @@ impl P2pSession {
         headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
         let message = format!("{headers}{body}");
-        self.identifier += 1;
+        self.identifier.fetch_add(1, Ordering::SeqCst);
 
         let mut invite = BinaryHeader {
             session_id: 0,
-            identifier: self.identifier,
+            identifier: self.identifier.load(Ordering::SeqCst),
             data_offset: 0,
             total_data_size: message.len() as u64,
             length: message.len() as u32,
@@ -307,26 +322,24 @@ impl P2pSession {
         Ok(ack_header)
     }
 
-    pub fn ok(&mut self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
-        let mut body = "EUF-GUID: {A4268EEC-FEC5-49E5-95C3-F126696BDBF6}\r\n".to_string();
-        body.push_str(format!("SessionID: {}\r\n\r\n\0", self.session_id).as_str());
-
+    pub fn ok(&self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
+        let body = format!("SessionID: {}\r\n\r\n\0", self.session_id);
         let mut headers = "MSNSLP/1.0 200 OK\r\n".to_string();
         headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());
         headers.push_str(format!("From: <msnmsgr:{from}>\r\n").as_str());
         headers.push_str(format!("Via: MSNSLP/1.0/TLP ;branch={{{}}}\r\n", self.branch).as_str());
-        headers.push_str("CSeq: 1\r\n");
+        headers.push_str("CSeq: 1 \r\n");
         headers.push_str(format!("Call-ID: {{{}}}\r\n", self.call_id).as_str());
         headers.push_str("Max-Forwards: 0\r\n");
         headers.push_str("Content-Type: application/x-msnmsgr-sessionreqbody\r\n");
         headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
         let message = format!("{headers}{body}");
-        self.identifier += 1;
+        self.identifier.fetch_add(1, Ordering::SeqCst);
 
         let mut ok = BinaryHeader {
             session_id: 0,
-            identifier: self.identifier,
+            identifier: self.identifier.load(Ordering::SeqCst),
             data_offset: 0,
             total_data_size: message.len() as u64,
             length: message.len() as u32,
@@ -343,25 +356,160 @@ impl P2pSession {
         Ok(ok)
     }
 
-    pub fn decline(&mut self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
-        let body = format!("SessionID: {}\r\n\r\n\0", self.session_id);
+    #[cfg(feature = "file-transfers")]
+    pub async fn direct_connection_ok(
+        &self,
+        to: &str,
+        from: &str,
+    ) -> Result<DirectConnectionOkResult, P2pError> {
+        let nonce = guid_create::GUID::rand();
+        let mut body = "Bridge: TCPv1\r\n".to_string();
+        body.push_str("Listening: true\r\n");
+        body.push_str(format!("Nonce: {nonce}\r\n",).as_str());
 
-        let mut headers = "MSNSLP/1.0 603 Decline\r\n".to_string();
+        let ips = interface_addrs().or(Err(P2pError::CouldNotGetIpAddress))?;
+        let mut ipv4s = Vec::new();
+        let mut ipv6s = Vec::new();
+
+        for ip in ips {
+            if !ip.addr().is_loopback() && !ip.addr().is_multicast() {
+                if ip.addr().is_ipv6() {
+                    ipv6s.push(ip.addr());
+                } else {
+                    ipv4s.push(ip.addr());
+                }
+            }
+        }
+
+        body.push_str("IPv4Internal-Addrs: ");
+        for ip in ipv4s {
+            body.push_str(format!("{ip} ").as_str());
+        }
+
+        body.pop();
+        body.push_str("\r\n");
+
+        let mut ipv4_listener = None;
+        if let Ok(listener) = TcpListener::bind("0.0.0.0:0").await
+            && let Ok(local_addr) = listener.local_addr()
+        {
+            body.push_str(format!("IPv4Internal-Port: {}\r\n", local_addr.port()).as_str());
+            ipv4_listener = Some(listener);
+        }
+
+        body.push_str("IPv6-Addrs: ");
+        for ip in ipv6s {
+            body.push_str(format!("{ip} ").as_str());
+        }
+
+        body.pop();
+        body.push_str("\r\n");
+
+        let mut ipv6_listener = None;
+        if let Ok(listener) = TcpListener::bind("0.0.0.0:0").await
+            && let Ok(local_addr) = listener.local_addr()
+        {
+            body.push_str(format!("IPv6-Port: {}\r\n", local_addr.port()).as_str());
+            ipv6_listener = Some(listener);
+        }
+
+        body.push_str("\r\n\0");
+
+        let mut headers = "MSNSLP/1.0 200 OK\r\n".to_string();
         headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());
         headers.push_str(format!("From: <msnmsgr:{from}>\r\n").as_str());
         headers.push_str(format!("Via: MSNSLP/1.0/TLP ;branch={{{}}}\r\n", self.branch).as_str());
-        headers.push_str("CSeq: 1\r\n");
+        headers.push_str("CSeq: 1 \r\n");
         headers.push_str(format!("Call-ID: {{{}}}\r\n", self.call_id).as_str());
         headers.push_str("Max-Forwards: 0\r\n");
         headers.push_str("Content-Type: application/x-msnmsgr-sessionreqbody\r\n");
         headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
         let message = format!("{headers}{body}");
-        self.identifier += 1;
+        self.identifier.fetch_add(1, Ordering::SeqCst);
+
+        let mut ok = BinaryHeader {
+            session_id: 0,
+            identifier: self.identifier.load(Ordering::SeqCst),
+            data_offset: 0,
+            total_data_size: message.len() as u64,
+            length: message.len() as u32,
+            flag: 0x00,
+            ack_identifier: rng().next_u32(),
+            ack_unique_id: 0,
+            ack_data_size: 0,
+        }
+        .to_bytes()
+        .or(Err(P2pError::BinaryHeaderWritingError))?;
+
+        ok.extend_from_slice(message.as_bytes());
+        ok.extend_from_slice(&[0; 4]);
+
+        Ok(DirectConnectionOkResult {
+            ok,
+            nonce,
+            ipv4_listener,
+            ipv6_listener,
+        })
+    }
+
+    #[cfg(feature = "file-transfers")]
+    pub(crate) async fn set_up_direct_connection_listeners(
+        &self,
+        ipv4_listener: Option<TcpListener>,
+        ipv6_listener: Option<TcpListener>,
+        nonce: guid_create::GUID,
+        internal_tx: broadcast::Sender<InternalEvent>,
+    ) -> Result<(), P2pError> {
+        let identifier = self.identifier.clone();
+        let internal_ipv4_tx = internal_tx.clone();
+
+        if let Some(ipv4_listener) = ipv4_listener {
+            tokio::spawn(async move {
+                while let Ok((mut socket, _)) = ipv4_listener.accept().await {
+                    listen_for_file(
+                        &mut socket,
+                        nonce,
+                        identifier.clone(),
+                        internal_ipv4_tx.clone(),
+                    )
+                    .await;
+                }
+            });
+        }
+
+        let identifier = self.identifier.clone();
+        if let Some(ipv6_listener) = ipv6_listener {
+            tokio::spawn(async move {
+                while let Ok((mut socket, _)) = ipv6_listener.accept().await {
+                    listen_for_file(&mut socket, nonce, identifier.clone(), internal_tx.clone())
+                        .await;
+                }
+            });
+        }
+
+        Ok(())
+    }
+
+    pub fn decline(&self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
+        let body = format!("SessionID: {}\r\n\r\n\0", self.session_id);
+
+        let mut headers = "MSNSLP/1.0 603 Decline\r\n".to_string();
+        headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());
+        headers.push_str(format!("From: <msnmsgr:{from}>\r\n").as_str());
+        headers.push_str(format!("Via: MSNSLP/1.0/TLP ;branch={{{}}}\r\n", self.branch).as_str());
+        headers.push_str("CSeq: 1 \r\n");
+        headers.push_str(format!("Call-ID: {{{}}}\r\n", self.call_id).as_str());
+        headers.push_str("Max-Forwards: 0\r\n");
+        headers.push_str("Content-Type: application/x-msnmsgr-sessionreqbody\r\n");
+        headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
+
+        let message = format!("{headers}{body}");
+        self.identifier.fetch_add(1, Ordering::SeqCst);
 
         let mut decline = BinaryHeader {
             session_id: 0,
-            identifier: self.identifier,
+            identifier: self.identifier.load(Ordering::SeqCst),
             data_offset: 0,
             total_data_size: message.len() as u64,
             length: message.len() as u32,
@@ -378,13 +526,13 @@ impl P2pSession {
         Ok(decline)
     }
 
-    pub fn data_preparation(&mut self) -> Result<Vec<u8>, P2pError> {
+    pub fn data_preparation(&self) -> Result<Vec<u8>, P2pError> {
         let message = &[0; 4];
-        self.identifier += 1;
+        self.identifier.fetch_add(1, Ordering::SeqCst);
 
         let mut data_preparation = BinaryHeader {
             session_id: self.session_id,
-            identifier: self.identifier,
+            identifier: self.identifier.load(Ordering::SeqCst),
             data_offset: 0,
             total_data_size: message.len() as u64,
             length: message.len() as u32,
@@ -401,17 +549,17 @@ impl P2pSession {
         Ok(data_preparation)
     }
 
-    pub fn data(&mut self, data: &[u8], file_transfer: bool) -> Result<Vec<Vec<u8>>, P2pError> {
+    pub fn data(&self, data: &[u8], file_transfer: bool) -> Result<Vec<Vec<u8>>, P2pError> {
         let mut payloads: Vec<Vec<u8>> = Vec::new();
         let total_data_size = data.len() as u64;
         let mut data_offset = 0u64;
-        self.identifier += 1;
+        self.identifier.fetch_add(1, Ordering::SeqCst);
 
         let chunks = data.chunks(1202);
         for chunk in chunks {
             let mut data_message = BinaryHeader {
                 session_id: self.session_id,
-                identifier: self.identifier,
+                identifier: self.identifier.load(Ordering::SeqCst),
                 data_offset,
                 total_data_size,
                 length: chunk.len() as u32,
@@ -433,25 +581,25 @@ impl P2pSession {
         Ok(payloads)
     }
 
-    pub fn bye(&mut self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
+    pub fn bye(&self, to: &str, from: &str) -> Result<Vec<u8>, P2pError> {
         let body = "\r\n\0";
 
         let mut headers = format!("BYE MSNMSGR:{to} MSNSLP/1.0\r\n");
         headers.push_str(format!("To: <msnmsgr:{to}>\r\n").as_str());
         headers.push_str(format!("From: <msnmsgr:{from}>\r\n").as_str());
         headers.push_str(format!("Via: MSNSLP/1.0/TLP ;branch={{{}}}\r\n", self.branch).as_str());
-        headers.push_str("CSeq: 0\r\n");
+        headers.push_str("CSeq: 0 \r\n");
         headers.push_str(format!("Call-ID: {{{}}}\r\n", self.call_id).as_str());
         headers.push_str("Max-Forwards: 0\r\n");
         headers.push_str("Content-Type: application/x-msnmsgr-sessionclosebody\r\n");
         headers.push_str(format!("Content-Length: {}\r\n\r\n", body.len()).as_str());
 
         let message = format!("{headers}{body}");
-        self.identifier += 1;
+        self.identifier.fetch_add(1, Ordering::SeqCst);
 
         let mut bye = BinaryHeader {
             session_id: 0,
-            identifier: self.identifier,
+            identifier: self.identifier.load(Ordering::SeqCst),
             data_offset: 0,
             total_data_size: message.len() as u64,
             length: message.len() as u32,
@@ -470,7 +618,7 @@ impl P2pSession {
 
     #[cfg(feature = "file-transfers")]
     pub async fn direct_connection_send_file(
-        &mut self,
+        &self,
         ips: &[String],
         port: u16,
         nonce: &guid_create::GUID,
@@ -485,11 +633,11 @@ impl P2pSession {
                 let _ = socket.write_all(&u32::to_le_bytes(48)).await;
 
                 let mut message = Vec::with_capacity(48);
-                self.identifier += 1;
+                self.identifier.fetch_add(1, Ordering::SeqCst);
 
                 let header = BinaryHeader {
                     session_id: 0,
-                    identifier: self.identifier,
+                    identifier: self.identifier.load(Ordering::SeqCst),
                     data_offset: 0,
                     total_data_size: 0,
                     length: 0,
@@ -562,12 +710,12 @@ impl P2pSession {
                     if received_nonce == *nonce {
                         let total_data_size = file.len() as u64;
                         let mut data_offset = 0u64;
-                        self.identifier += 1;
+                        self.identifier.fetch_add(1, Ordering::SeqCst);
 
                         for chunk in file.chunks(1352) {
                             let mut message = BinaryHeader {
                                 session_id: self.session_id,
-                                identifier: self.identifier,
+                                identifier: self.identifier.load(Ordering::SeqCst),
                                 data_offset,
                                 total_data_size,
                                 length: chunk.len() as u32,

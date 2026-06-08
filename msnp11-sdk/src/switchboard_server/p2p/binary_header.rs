@@ -1,6 +1,6 @@
 use deku::{DekuRead, DekuWrite};
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[deku(endian = "little")]
 pub struct BinaryHeader {
     pub session_id: u32,

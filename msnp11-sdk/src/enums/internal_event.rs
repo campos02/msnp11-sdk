@@ -1,3 +1,6 @@
+#[cfg(feature = "file-transfers")]
+use crate::switchboard_server::p2p::binary_header::BinaryHeader;
+
 #[derive(Debug, Clone)]
 pub(crate) enum InternalEvent {
     ServerReply(String),
@@ -14,7 +17,7 @@ pub(crate) enum InternalEvent {
         port: u16,
     },
 
-    P2pDisplayPictureInvite {
+    DisplayPictureInvite {
         to: String,
         from: String,
         branch: guid_create::GUID,
@@ -25,20 +28,20 @@ pub(crate) enum InternalEvent {
     },
 
     #[cfg(feature = "file-transfers")]
-    P2pFileTransferInvite {
+    FileTransferInvite {
         to: String,
         from: String,
         branch: guid_create::GUID,
         call_id: guid_create::GUID,
         session_id: u32,
-        context: String,
+        file_size: u64,
+        file_name: String,
         message: Vec<u8>,
     },
 
     #[cfg(feature = "file-transfers")]
     P2pDirectConnectionInvite {
         to: String,
-        from: String,
         branch: guid_create::GUID,
         call_id: guid_create::GUID,
         message: Vec<u8>,
@@ -49,16 +52,19 @@ pub(crate) enum InternalEvent {
         message: Vec<u8>,
     },
 
+    #[cfg(feature = "file-transfers")]
     P2pOk {
         destination: String,
         message: Vec<u8>,
     },
 
+    #[cfg(feature = "file-transfers")]
     P2pDecline {
         destination: String,
         message: Vec<u8>,
     },
 
+    #[cfg(feature = "file-transfers")]
     P2pDirectConnectionOk {
         destination: String,
         message: Vec<u8>,
@@ -72,6 +78,12 @@ pub(crate) enum InternalEvent {
     P2pData {
         destination: String,
         message: Vec<u8>,
+    },
+
+    #[cfg(feature = "file-transfers")]
+    P2pDirectConnectionData {
+        binary_header: BinaryHeader,
+        data: Vec<u8>,
     },
 
     P2pBye {

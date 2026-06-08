@@ -4,11 +4,11 @@
 pub enum P2pError {
     #[error("P2P session kind not supported")]
     P2pInvite,
-    #[error("Invite is for a different user")]
+    #[error("Request is for a different user")]
     OtherDestination,
     #[error("Could get session data")]
     CouldNotGetSessionData,
-    #[error("Invite has an invalid context")]
+    #[error("Request has an invalid context")]
     OtherContext,
     #[error("Could not read binary header from P2P message")]
     BinaryHeaderReadingError,

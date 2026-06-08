@@ -1,4 +1,5 @@
 use crate::enums::msnp_list::MsnpList;
+use crate::models::file_transfer_request::FileTransferRequest;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::plain_text::PlainText;
 use crate::models::presence::Presence;
@@ -92,6 +93,13 @@ pub enum Event {
 
     /// A contact's display picture was transferred.
     DisplayPicture { email: String, data: Vec<u8> },
+
+    /// A contact requested to transfer a file.
+    FileTransferRequest {
+        file_name: String,
+        file_size: u64,
+        request: FileTransferRequest,
+    },
 
     /// The server has warned it will shut down for maintenance.
     ServerMaintenanceScheduled { time_remaining: u32 },
