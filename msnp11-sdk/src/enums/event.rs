@@ -95,8 +95,8 @@ pub enum Event {
     /// A contact's display picture was transferred.
     DisplayPicture { email: String, data: Vec<u8> },
 
-    /// A contact requested to transfer a file.
     #[cfg(feature = "file-transfers")]
+    /// A contact requested to transfer a file.
     FileTransferRequest {
         email: String,
         file_name: String,

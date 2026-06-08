@@ -2,6 +2,7 @@ use crate::errors::messaging_error::MessagingError;
 use crate::errors::p2p_error::P2pError;
 use crate::errors::sdk_error::SdkError;
 use crate::event_handler::EventHandler;
+use crate::models::file_transfer_request::FileTransferRequest;
 use crate::{PlainText, Switchboard};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -71,6 +72,37 @@ impl SwitchboardWrapper {
                 .request_contact_display_picture(email, msn_object)
                 .await
         })
+    }
+
+    /// Sends a file to a participant. This returns once the transfer is complete.
+    pub async fn send_file(
+        &self,
+        email: &str,
+        file_name: &str,
+        file: &[u8],
+    ) -> Result<(), P2pError> {
+        self.rt
+            .block_on(async { self.inner.send_file(email, file_name, file).await })
+    }
+
+    /// Accepts a file transfer request from a participant. This returns the file data if the transfer
+    /// was successful.
+    ///
+    /// The `request` argument comes from the [FileTransferRequest][Event::FileTransferRequest] event.
+    pub async fn accept_file_request(
+        &self,
+        request: FileTransferRequest,
+    ) -> Result<Vec<u8>, P2pError> {
+        self.rt
+            .block_on(async { self.inner.accept_file_request(request).await })
+    }
+
+    /// Declines a file transfer request.
+    ///
+    /// The `request` argument comes from the [FileTransferRequest][Event::FileTransferRequest] event.
+    pub async fn decline_file_request(&self, request: FileTransferRequest) -> Result<(), P2pError> {
+        self.rt
+            .block_on(async { self.inner.decline_file_request(request).await })
     }
 
     /// Disconnects from the Switchboard.

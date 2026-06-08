@@ -444,6 +444,7 @@ impl Switchboard {
         Ok(())
     }
 
+    /// Sends a file to a participant. This returns once the transfer is complete.
     #[cfg(feature = "file-transfers")]
     pub async fn send_file(
         &self,
@@ -515,7 +516,7 @@ impl Switchboard {
                     let ack = P2pSession::acknowledge(&message)?;
                     msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, email).await?;
 
-                    // Use direct connection if possible or fall back to sending through Switchboard
+                    // Use direct connection if possible or fall back to sending through switchboard
                     if !listening
                         || bridge != "TCPv1"
                         || session
@@ -584,6 +585,10 @@ impl Switchboard {
         Ok(())
     }
 
+    /// Accepts a file transfer request from a participant. This returns the file data if the transfer
+    /// was successful.
+    ///
+    /// The `request` argument comes from the [FileTransferRequest][Event::FileTransferRequest] event.
     #[cfg(feature = "file-transfers")]
     pub async fn accept_file_request(
         &self,
@@ -692,6 +697,9 @@ impl Switchboard {
         Ok(file)
     }
 
+    /// Declines a file transfer request.
+    ///
+    /// The `request` argument comes from the [FileTransferRequest][Event::FileTransferRequest] event.
     #[cfg(feature = "file-transfers")]
     pub async fn decline_file_request(&self, request: FileTransferRequest) -> Result<(), P2pError> {
         {
