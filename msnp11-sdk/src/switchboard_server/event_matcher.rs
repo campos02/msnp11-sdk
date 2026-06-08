@@ -2,6 +2,7 @@ use crate::enums::event::Event;
 use crate::enums::internal_event::InternalEvent;
 use crate::models::plain_text::PlainText;
 use crate::switchboard_server::p2p::binary_header::BinaryHeader;
+#[cfg(feature = "file-transfers")]
 use crate::switchboard_server::p2p::file_context::FileContext;
 #[cfg(feature = "file-transfers")]
 use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -241,7 +242,7 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                             "application/x-msnmsgr-sessionreqbody" => {
                                 if let Some(euf_guid) = euf_guid
                                     && let Some(session_id) = session_id
-                                    && let Some(mut context) = context
+                                    && let Some(context) = context
                                 {
                                     match euf_guid.as_str() {
                                         "{A4268EEC-FEC5-49E5-95C3-F126696BDBF6}" => {
@@ -259,6 +260,7 @@ pub fn into_internal_event(message: &[u8]) -> InternalEvent {
                                         #[cfg(feature = "file-transfers")]
                                         "{5D3E02AB-6190-11D3-BBBB-00C04F795683}" => {
                                             // Padding
+                                            let mut context = context;
                                             while context.len() % 4 != 0 {
                                                 context.push('=');
                                             }

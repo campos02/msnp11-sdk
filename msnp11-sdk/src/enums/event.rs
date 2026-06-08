@@ -1,4 +1,5 @@
 use crate::enums::msnp_list::MsnpList;
+#[cfg(feature = "file-transfers")]
 use crate::models::file_transfer_request::FileTransferRequest;
 use crate::models::personal_message::PersonalMessage;
 use crate::models::plain_text::PlainText;
@@ -95,7 +96,9 @@ pub enum Event {
     DisplayPicture { email: String, data: Vec<u8> },
 
     /// A contact requested to transfer a file.
+    #[cfg(feature = "file-transfers")]
     FileTransferRequest {
+        email: String,
         file_name: String,
         file_size: u64,
         request: FileTransferRequest,

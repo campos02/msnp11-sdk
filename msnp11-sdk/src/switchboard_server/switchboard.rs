@@ -161,7 +161,7 @@ impl Switchboard {
                                     context,
                                     message: invite,
                                 } => {
-                                    let session = P2pSession::new_from_existing_session(branch, call_id, session_id);
+                                    let mut session = P2pSession::new_from_existing_session(branch, call_id, session_id);
                                     let _ = session.handle_display_picture_invite(
                                             &to,
                                             &from,
@@ -191,6 +191,7 @@ impl Switchboard {
                                     }
 
                                     let _ = event_tx.send(Event::FileTransferRequest {
+                                        email: from.clone(),
                                         file_name,
                                         file_size,
                                         request: FileTransferRequest {
@@ -427,9 +428,6 @@ impl Switchboard {
 
                 _ => (),
             }
-
-            // Introduce some delay so all chunks are received
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
         let bye = session.bye(email, &user_email)?;
@@ -587,7 +585,10 @@ impl Switchboard {
     }
 
     #[cfg(feature = "file-transfers")]
-    pub async fn accept_file_request(&self, request: FileTransferRequest) -> Result<(), P2pError> {
+    pub async fn accept_file_request(
+        &self,
+        request: FileTransferRequest,
+    ) -> Result<Vec<u8>, P2pError> {
         {
             let user_data = self.user_data.read().await;
             let user_email = user_data.email.as_ref().ok_or(P2pError::NotLoggedIn)?;
@@ -603,7 +604,8 @@ impl Switchboard {
 
         let branch = guid_create::GUID::parse(&request.branch).or(Err(P2pError::P2pInvite))?;
         let call_id = guid_create::GUID::parse(&request.call_id).or(Err(P2pError::P2pInvite))?;
-        let session = P2pSession::new_from_existing_session(branch, call_id, request.session_id);
+        let mut session =
+            P2pSession::new_from_existing_session(branch, call_id, request.session_id);
 
         let ok = session.ok(&email, &user_email)?;
         {
@@ -637,28 +639,12 @@ impl Switchboard {
                         continue;
                     }
 
-                    let session = P2pSession::new_from_existing_session(branch, call_id, 0);
+                    let mut session = P2pSession::new_from_existing_session(branch, call_id, 0);
                     let ack = P2pSession::acknowledge(&invite)?;
                     msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ack, &email).await?;
 
-                    let ok_result = session.direct_connection_ok(&email, &user_email).await?;
-                    let _ = session
-                        .set_up_direct_connection_listeners(
-                            ok_result.ipv4_listener,
-                            ok_result.ipv6_listener,
-                            ok_result.nonce,
-                            self.internal_tx.clone(),
-                        )
-                        .await;
-
-                    msg::send_p2p(
-                        &self.tr_id,
-                        &self.sb_tx,
-                        &mut internal_rx,
-                        ok_result.ok,
-                        &email,
-                    )
-                    .await?;
+                    let ok = session.direct_connection_ok(&email, &user_email).await?;
+                    msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, ok, &email).await?;
                 }
 
                 InternalEvent::P2pData {
@@ -690,24 +676,8 @@ impl Switchboard {
                     }
                 }
 
-                InternalEvent::P2pDirectConnectionData {
-                    binary_header,
-                    data,
-                } => {
-                    file.extend_from_slice(&data);
-                    let data_len = file.len();
-                    trace!("Data received so far: {data_len}");
-
-                    if data_len as u64 == binary_header.total_data_size {
-                        break;
-                    }
-                }
-
                 _ => (),
             }
-
-            // Introduce some delay so all chunks are received
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
         // Check if the transfer was cancelled at some point
@@ -719,7 +689,7 @@ impl Switchboard {
             }
         }
 
-        Ok(())
+        Ok(file)
     }
 
     #[cfg(feature = "file-transfers")]
@@ -739,7 +709,8 @@ impl Switchboard {
         let mut internal_rx = self.internal_tx.subscribe();
         let branch = guid_create::GUID::parse(&request.branch).or(Err(P2pError::P2pInvite))?;
         let call_id = guid_create::GUID::parse(&request.call_id).or(Err(P2pError::P2pInvite))?;
-        let session = P2pSession::new_from_existing_session(branch, call_id, request.session_id);
+        let mut session =
+            P2pSession::new_from_existing_session(branch, call_id, request.session_id);
 
         let decline = session.decline(&email, &user_email)?;
         msg::send_p2p(&self.tr_id, &self.sb_tx, &mut internal_rx, decline, &email).await

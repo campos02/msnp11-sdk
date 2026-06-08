@@ -546,7 +546,7 @@ impl Client {
         let sha1d = STANDARD.encode(hash.digest().bytes());
         let sha1c = format!(
             "Creator{user_email}Size{}Type3LocationPIC.tmpFriendlyAAA=SHA1D{sha1d}",
-            display_picture.len() as u32
+            display_picture.len() as u64
         );
 
         let mut hash = sha1_smol::Sha1::new();

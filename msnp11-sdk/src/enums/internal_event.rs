@@ -1,6 +1,3 @@
-#[cfg(feature = "file-transfers")]
-use crate::switchboard_server::p2p::binary_header::BinaryHeader;
-
 #[derive(Debug, Clone)]
 pub(crate) enum InternalEvent {
     ServerReply(String),
@@ -78,12 +75,6 @@ pub(crate) enum InternalEvent {
     P2pData {
         destination: String,
         message: Vec<u8>,
-    },
-
-    #[cfg(feature = "file-transfers")]
-    P2pDirectConnectionData {
-        binary_header: BinaryHeader,
-        data: Vec<u8>,
     },
 
     P2pBye {
