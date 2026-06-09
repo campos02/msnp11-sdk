@@ -1,3 +1,4 @@
+/// Used to accept or decline a file transfer request.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct FileTransferRequest {
